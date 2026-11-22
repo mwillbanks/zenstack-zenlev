@@ -71,13 +71,19 @@ const models = {
   },
 } as const satisfies SchemaDef['models']
 
-function nativeClient(dialect: 'postgresql' | 'mysql', url: string) {
+function nativeClient(dialect: 'postgresql' | 'mysql', url: string, searchPath = 'public') {
   return new ZenStackClient(
     { provider: { type: dialect }, models, plugins: {} },
     {
       dialect:
         dialect === 'postgresql'
-          ? new PostgresDialect({ pool: new Pool({ connectionString: url, max: 4 }) })
+          ? new PostgresDialect({
+              pool: new Pool({
+                connectionString: url,
+                max: 4,
+                options: '-c search_path=' + searchPath,
+              }),
+            })
           : new MysqlDialect({ pool: createPool({ uri: url, connectionLimit: 4 }) }),
     },
   )
@@ -196,6 +202,26 @@ for (const dialect of ['postgresql', 'mysql'] as const) {
         await rm(current.cwd, { recursive: true, force: true })
       }
     })
+
+    test.skipIf(dialect !== 'postgresql')(
+      'rolls back ledger creation when it would change the PostgreSQL search path',
+      async () => {
+        const client = nativeClient(dialect, url!, 'zenlev,public')
+        const zenlev = await createZenlev({ cwd: fixture!.cwd, client })
+        try {
+          await expect(zenlev.db.push({ dropMissingTables: 'skip' })).rejects.toThrow(
+            'Creating the Zenlev ledger would change the PostgreSQL search path',
+          )
+          const result = await sql<{ schema: string | null }>`
+            SELECT pg_catalog.to_regnamespace('zenlev')::text AS schema
+          `.execute(client.$qbRaw)
+          expect(result.rows[0]?.schema).toBeNull()
+        } finally {
+          await zenlev.close()
+          await client.$disconnect()
+        }
+      },
+    )
 
     test('pushes mapped tables, defaults, indexes and foreign keys and then produces no diff', async () => {
       const f = fixture!

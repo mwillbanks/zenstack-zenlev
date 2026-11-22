@@ -20,4 +20,6 @@ Use this client in `defineConfig({ client: db })`, or construct it in an owned f
 
 The default ledger lives in the `zenlev` schema. Grant the migration connection permission to create and use it. Choose an explicit table store when your environment requires it.
 
+Zenlev refuses to create a ledger schema if it would change PostgreSQL's effective search path. This can happen when the connection role is named `zenlev` and uses PostgreSQL's default search path. Set the pool's `options` to `'-c search_path=public'` if your application uses `public`, or set `store.schemaName` to a schema outside the application's search path.
+
 PostgreSQL supports transactional DDL for ordinary schema operations. Operations such as concurrent index creation need a deliberately non-transactional migration. Review `--no-transaction` warnings and prepare recovery before running those operations.

@@ -180,11 +180,24 @@ export function createStore(
     mutationRoot()
     if (await exists(names.lock)) await lockRow()
     if (names.namespace !== undefined) {
-      const query =
-        names.kind === 'schema'
-          ? sql`CREATE SCHEMA IF NOT EXISTS ${sql.id(names.namespace)}`
-          : sql`CREATE DATABASE IF NOT EXISTS ${sql.id(names.namespace)}`
-      await query.execute(root.physical)
+      const namespace = sql.id(names.namespace)
+      if (names.kind === 'schema') {
+        await adapter.transaction(async ({ physical }) => {
+          const searchPath = sql<{
+            path: string
+          }>`SELECT pg_catalog.current_schemas(false)::text AS path`
+          const before = (await searchPath.execute(physical)).rows[0]!.path
+          await sql`CREATE SCHEMA IF NOT EXISTS ${namespace}`.execute(physical)
+          const after = (await searchPath.execute(physical)).rows[0]!.path
+          if (before !== after) {
+            throw new Error(
+              'Creating the Zenlev ledger would change the PostgreSQL search path. Set an explicit application search_path or choose a different store.schemaName.',
+            )
+          }
+        })
+      } else {
+        await sql`CREATE DATABASE IF NOT EXISTS ${namespace}`.execute(root.physical)
+      }
     }
     await sql`CREATE TABLE IF NOT EXISTS ${names.lock.identifier} (lock_id VARCHAR(64) PRIMARY KEY, owner VARCHAR(191), acquired_at TEXT, version INTEGER NOT NULL)`.execute(
       root.physical,
