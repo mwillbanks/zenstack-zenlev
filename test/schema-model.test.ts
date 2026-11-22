@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { loadSchemaModel, resolveSchemaPath } from '../src/schema-model'
 
 let cwd: string
@@ -285,9 +285,8 @@ view UserView { id Int @unique }
     )
     expect((await loadSchemaModel({ cwd })).tables.map((table) => table.model)).toEqual(['User'])
     const included = await loadSchemaModel({ cwd, excludeViews: false })
-    expect(included.unsupported).toMatchObject([
-      { code: 'VIEW_DEFINITION', source: { path: join(cwd, 'schema.zmodel'), line: 6 } },
-    ])
+    expect(included.unsupported).toMatchObject([{ code: 'VIEW_DEFINITION', source: { line: 6 } }])
+    expect(relative(cwd, included.unsupported[0]!.source.path)).toBe('schema.zmodel')
   })
 
   test('projects explicit PostgreSQL namespaces for tables, enums, and foreign keys', async () => {
