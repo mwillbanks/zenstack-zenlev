@@ -1,0 +1,15 @@
+export const legacyDocPaths: Readonly<Record<string, string>> = {
+  adoption: 'guides/adoption',
+  api: 'reference/api',
+  commands: 'reference/commands',
+  configuration: 'reference/configuration',
+  graph: 'guides/graph',
+  migrations: 'guides/migrations',
+  mysql: 'dialects/mysql',
+  'plugins-telemetry': 'reference/plugins-telemetry',
+  postgresql: 'dialects/postgresql',
+  'quick-start': 'guides/quick-start',
+  'rollback-recovery': 'guides/rollback-recovery',
+  'schema-changes': 'guides/schema-changes',
+  sqlite: 'dialects/sqlite',
+}

@@ -1,0 +1,77 @@
+---
+title: 'Rollback and recovery'
+description: 'Record compensation and reconcile uncertain execution with evidence.'
+---
+
+A deployed database keeps receiving data and serving multiple application versions. Reversing a change requires a decision about its dependents and subsequent writes.
+
+Zenlev records compensation as a new superseding migration. Recovery reconciles an execution whose database outcome needs operator inspection.
+
+## Choose the rollback mode
+
+```sh
+bun run zenlev migrate rollback --id <id> --cascade --dry-run
+bun run zenlev migrate rollback --id <id> --cascade --format
+bun run zenlev migrate rollback --id <id> --compensate --format
+```
+
+`--cascade` includes active transitive dependents in reverse dependency order. Use it when the target and its dependent changes must be reversed together.
+
+`--compensate` selects the target and warns about active dependents. Review how those dependents will continue to operate before choosing it.
+
+Both modes generate a superseding migration for review. Generation leaves the database work for a later apply. Review its reversal set and apply that generated migration through the ordinary workflow.
+
+Every included active migration must have a local `down` handler with an accepted hash. Zenlev verifies source hashes before invoking those handlers.
+
+A destination where an entry never applied skips its reversal. A cascade stops if new active dependents fall outside the generated reversal set. Regenerate and review against the destination's current history.
+
+The rollback `--namespace` option sets the generated file's namespace. The target ID identifies the migration to reverse across the ledger.
+
+## Non-transactional failures
+
+MySQL DDL and explicitly non-transactional runs can leave partial database changes. Zenlev records the attempt before execution and keeps unresolved attempts blocked.
+
+1. Inspect the failed migration and its observed attempt ID.
+2. Inspect affected database objects and rows.
+3. Reconcile the actual effects with the intended handler outcome.
+4. Record an actor, reason, and evidence.
+5. Mark the attempt applied or eligible to retry.
+
+The recovery operation checks the observed attempt ID. A changed attempt requires a new inspection.
+
+```ts
+await zenlev.migrate.recover({
+  action: 'retry',
+  id: migrationId,
+  attemptId: observedAttemptId,
+  actor: 'deployment-operator',
+  reason: 'Reconciled the failed backfill',
+  evidence: 'Reviewed affected rows and restored the documented precondition',
+})
+```
+
+Choose `action: 'applied'` only after verifying that the complete intended change exists. Choose `retry` after restoring a state where rerunning the handler is safe.
+
+The same operation is available from the CLI.
+
+```sh
+bun run zenlev migrate recover --action retry --id <id> --attempt-id <observed-attempt> --actor deployment-operator --reason "Reconciled the backfill" --evidence "Verified rows and restored the precondition"
+```
+
+## Abandoned locks
+
+Confirm the owner is inactive before releasing its lock. Supply the exact observed owner token.
+
+```ts
+await zenlev.migrate.recover({
+  action: 'release-lock',
+  owner: observedOwner,
+  actor: 'deployment-operator',
+  reason: 'The owning deployment process terminated',
+  evidence: 'Verified the process and database session ended',
+})
+```
+
+Lock age alone does not authorize reclamation. Recovery decisions are auditable operator actions. The exact owner token prevents releasing a different runner's lock after ownership changes.
+
+For normal deployment sequencing, use [Staged deployments](./guides/deployments). For available operator flags, use the [Command reference](./reference/commands).

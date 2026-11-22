@@ -1,0 +1,97 @@
+---
+title: 'Configuration'
+description: 'Choose project paths, environment routing, stores, and connection ownership.'
+---
+
+Configuration precedence runs from CLI or API overrides, through dedicated configuration, through the `zenlev` package.json key, to defaults.
+
+Supported dedicated files are `zenlev.config.ts`, `zenlev.config.js`, and `zenlev.config.json`. Discovery checks them in that order. Use `--config <path>` to choose a dedicated file.
+
+## Environment-aware client factory
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+import { createClientForEnvironment } from './db'
+
+export default defineConfig({
+  createClient: async ({ name, cwd }) => {
+    const client = await createClientForEnvironment(name, cwd)
+    return {
+      client,
+      dispose: () => client.$disconnect(),
+    }
+  },
+  migrationsDir: 'migrations',
+  hashing: { algorithm: 'sha256', normalizeLineEndings: true },
+})
+```
+
+The factory receives the effective environment and working directory. Select them with `--env` and `--cwd`. Your factory maps the environment name to the intended connection and credentials.
+
+Choose one connection source per configuration. A supplied `client` is borrowed. A `createClient` factory returns an owned client and an explicit disposer. A generic `adapter` supplies the Kysely execution boundary.
+
+Zenlev passes environment selection to your code without changing process globals. See [Namespaces and environments](./guides/namespaces) for how routing relates to migration selection.
+
+## Settings
+
+| Setting                           | Default or purpose                                |
+| --------------------------------- | ------------------------------------------------- |
+| `cwd`                             | Effective project working directory               |
+| `env`                             | `NODE_ENV`, or `development` when unset           |
+| `migrationsDir`                   | `migrations`, relative to effective `cwd`         |
+| `schema`                          | Explicit ZModel path, relative to effective `cwd` |
+| `namespaces`                      | Optional namespace descriptions                   |
+| `hashing.algorithm`               | `sha256`                                          |
+| `hashing.normalizeLineEndings`    | `true`, normalizes CRLF to LF                     |
+| `diff.excludeViews`               | `true`                                            |
+| `plugins`                         | Plugins in registration order                     |
+| `onWarning`                       | Structured warning callback                       |
+| `telemetry.opentelemetry.enabled` | `false`                                           |
+
+Namespace descriptions provide configuration metadata. Select migration namespaces explicitly when invoking apply, status, or tree.
+
+SHA-512, SHA-1, and MD5 are also supported hash algorithms. Keep hash settings stable across environments that share migration files.
+
+## JSON configuration
+
+Reference a project module when JSON cannot hold the client factory.
+
+```json
+{
+  "migrationsDir": "migrations",
+  "clientModule": "./zenlev-client.ts"
+}
+```
+
+Export the factory from the referenced module as its default export. Module references resolve relative to the declaring configuration file. Migration paths resolve relative to the effective project working directory.
+
+A `clientModule` in the `zenlev` package.json key resolves relative to that manifest.
+
+## Store location
+
+| Dialect    | Default           |
+| ---------- | ----------------- |
+| PostgreSQL | `zenlev` schema   |
+| MySQL      | `zenlev` database |
+| SQLite     | `zenlev_` tables  |
+
+The connection must have permission to create and access the chosen store. A permission failure stops execution.
+
+```ts
+export default defineConfig({
+  client: db,
+  store: {
+    location: 'table',
+    tableName: 'application_migrations',
+    lockTableName: 'application_migration_lock',
+  },
+})
+```
+
+The example assumes the `defineConfig` and `db` imports from your configuration. Table storage works across supported dialects.
+
+Use `schemaName` with PostgreSQL schema storage or `databaseName` with MySQL database storage. SQLite uses table storage. Unsupported location combinations fail validation.
+
+Keep each environment's store configuration stable after its first run. A different ledger presents a different history, even when the configured connection reaches the same database.
+
+See the [Dialect examples](./dialects) for connection permissions, PostgreSQL search paths, and DDL behavior.

@@ -16,7 +16,7 @@ export const db = new ZenStackClient(schema, {
 })
 ```
 
-Use this client in `defineConfig({ client: db })`, or construct it in an owned factory.
+Use this client in `defineConfig({ client: db })`, or construct it in an [owned factory](./guides/namespaces).
 
 The default ledger lives in the `zenlev` schema. Grant the migration connection permission to create and use it. Choose an explicit table store when your environment requires it.
 

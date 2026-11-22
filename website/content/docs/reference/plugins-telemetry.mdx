@@ -1,0 +1,75 @@
+---
+title: 'Plugins and telemetry'
+description: 'Extend migration context and observe execution through typed lifecycle hooks.'
+---
+
+Plugins let deployment systems attach their own context and lifecycle checks to Zenlev's command service. Telemetry records execution events for operating that workflow.
+
+## Lifecycle plugins
+
+Plugins register lifecycle hooks during setup. They can decorate context with static values and derive values per invocation.
+
+```ts
+import { definePlugin } from '@mwillbanks/zenstack-zenlev'
+
+export const auditPlugin = definePlugin({
+  name: 'audit',
+  decorate: { deploymentId: 'deployment-42' },
+  derive: (ctx) => ({ auditId: `${ctx.deploymentId}:${ctx.env.name}` }),
+  setup(api) {
+    api.onBeforeMigration((ctx, meta) => {
+      ctx.reporter.event('migration.reviewed', {
+        'zenlev.migration.id': meta.id,
+        status: 'reviewed',
+      })
+    })
+  },
+})
+```
+
+Register it through `defineConfig({ client: db, plugins: [auditPlugin] })` with your configured client.
+
+`definePlugin` infers decorated and derived context types for hooks. Derived values are recomputed for each command context. Hooks run in registration order. Context decorations must use unique keys.
+
+Lifecycle hooks cover initialization, commands, plans, migrations, warnings, errors, and store reads and writes. A before hook can return `false` to abort. A replacement plan must still satisfy selection, dependency, integrity, and transaction rules.
+
+Use hooks to inspect a deployment's context or narrow an eligible plan. Encode database prerequisites in migration metadata so all callers receive the same dependency rules.
+
+Observer-hook failures remain distinct from the outcome of committed migration work. Inspect the command outcome and stored state before deciding whether to retry.
+
+## OpenTelemetry
+
+Telemetry is disabled by default.
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+import { db } from './db'
+
+export default defineConfig({
+  client: db,
+  telemetry: {
+    opentelemetry: {
+      enabled: true,
+      serviceName: 'deployment-migrations',
+      exporter: 'otlp',
+      otlpEndpoint: 'http://localhost:4318/v1/traces',
+    },
+  },
+})
+```
+
+Choose `exporter: 'console'` for local inspection. It writes JSON spans to stderr. Enabling telemetry without specifying an exporter also selects console. The default service name is `zenlev`. Close the Zenlev service so exporters flush and shut down.
+
+The built-in reporter only exports `code`, `status`, `durationMs`, and `zenlev.migration.id` attributes. Values must be finite numbers, booleans, or short identifier strings. Other attributes are discarded, including custom `auditId` values.
+
+Credentials, SQL parameter values, migration data, and exception messages are excluded. Custom reporters remain responsible for their own data handling.
+
+## Warning coverage
+
+Schema comparison identifies known drops, narrowing changes, and constraint risks. Identifiable Kysely operations can expose additional warnings during execution.
+
+Arbitrary TypeScript and raw SQL can perform effects that automatic detection cannot infer. Declare warnings in migration metadata and review external side effects manually.
+
+Warnings help operators inspect expected risks. A warning does not establish that an application release is compatible with the new schema. Use [Staged deployments](./guides/deployments) to define compatibility checkpoints.
+
+See [Migration files](./guides/migrations#external-effects) for side-effect handling and [Configuration](./reference/configuration) for runtime settings.

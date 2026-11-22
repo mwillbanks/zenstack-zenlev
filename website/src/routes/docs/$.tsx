@@ -11,6 +11,7 @@ import { Suspense } from 'react'
 import { getMDXComponents } from '@/components/mdx'
 import { baseOptions } from '@/lib/layout.shared'
 import { source } from '@/lib/source'
+import { legacyDocPaths } from '@/lib/doc-paths'
 
 export const Route = createFileRoute('/docs/$')({
   component: Page,
@@ -20,18 +21,24 @@ export const Route = createFileRoute('/docs/$')({
     await clientLoader.preload(data.path)
     return data
   },
+  head: ({ loaderData }) => ({
+    links: loaderData?.canonical ? [{ rel: 'canonical', href: loaderData.canonical }] : [],
+  }),
 })
 
 const loadPage = createServerFn({ method: 'GET' })
   .validator((slugs: string[]) => slugs)
   .middleware([basePathStaticFunctionMiddleware, staticFunctionMiddleware])
   .handler(async ({ data: slugs }) => {
-    const page = source.getPage(slugs)
+    const slug = slugs.join('/')
+    const alias = Object.hasOwn(legacyDocPaths, slug) ? legacyDocPaths[slug] : undefined
+    const page = source.getPage(alias ? alias.split('/') : slugs)
     if (!page) throw notFound()
 
     return {
       pageTree: await source.serializePageTree(source.getPageTree()),
       path: page.path,
+      canonical: alias ? import.meta.env.BASE_URL + 'docs/' + alias + '/' : undefined,
     }
   })
 

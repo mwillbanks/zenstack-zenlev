@@ -1,0 +1,70 @@
+---
+title: 'Migration files'
+description: 'Express a change, its prerequisites, and its execution context.'
+---
+
+A migration is a TypeScript module with metadata and an `up` handler. Use it for schema operations, data backfills, and application-specific changes that require code.
+
+Migration filenames use `<cuid2>_<name>.ts`. Generate them with `migrate create` to keep filename, metadata ID, and creation time aligned.
+
+## Metadata
+
+`meta` requires `id`, `name`, `namespace`, and `createdAt`. It can also contain `dependsOn`, `supersedes`, `tags`, `custom`, `warnings`, and generated rollback metadata.
+
+```ts
+import type { MigrationMeta } from '@mwillbanks/zenstack-zenlev'
+
+export const meta = {
+  id: 'b12345678901234567890123',
+  name: 'backfill_customer_names',
+  namespace: 'deploy',
+  createdAt: '2026-11-22T12:00:00.000Z',
+  dependsOn: ['a12345678901234567890123'],
+  tags: ['customer-names'],
+  warnings: [{ code: 'DESTRUCTIVE_DATA', message: 'Replaces normalized customer name values' }],
+} satisfies MigrationMeta
+```
+
+The example depends on an existing migration with ID `a12345678901234567890123`. Dependencies and supersedes references use globally unique migration IDs within the ledger.
+
+Namespaces are ordinary strings, with `default` used when authoring omits one. Tags provide additional selection labels. Neither label creates dependency order.
+
+Use [Namespaces and environments](./guides/namespaces) to choose cohorts and database destinations. Use [Dependency graph](./guides/graph) to express prerequisites across cohorts.
+
+## Migration context
+
+| Property              | Purpose                                         |
+| --------------------- | ----------------------------------------------- |
+| `ctx.env`             | Selected environment name and working directory |
+| `ctx.db.kysely`       | Kysely query builder for the current execution  |
+| `ctx.db.schema`       | Schema builder on that query builder            |
+| `ctx.db.dialect.name` | Database dialect                                |
+| `ctx.zenstack.client` | ZenStack client for the current execution       |
+| `ctx.migration`       | Migration identity, file path, and hash         |
+| `ctx.reporter`        | Structured events, warnings, errors, and spans  |
+
+Transactional runs bind migration context and ledger writes to the same transaction. Use the context client inside a migration so database work participates in that boundary.
+
+For generic Kysely migrations, use `ctx.db.kysely` and `ctx.db.schema`. A standalone adapter has no ZenStack ORM client.
+
+## Hash integrity
+
+SHA-256 and CRLF-to-LF normalization are the defaults. SHA-512, SHA-1, and MD5 are also configurable.
+
+Hashes cover migration entry-file bytes. Zenlev verifies the selected source again before execution. Imported helpers, fetched resources, local data files, and external side effects require their own review and integrity controls.
+
+A changed applied file creates a hash mismatch. Inspect why the file changed before accepting its observed hash with `resolve` or managing alternatives with `reshape`. Both preserve the originally executed hash for audit.
+
+Prefer a new migration for new behavior. Accepting another hash changes integrity approval and never executes the edited handler by itself.
+
+See the [Command reference](./reference/commands#integrity-and-file-management) for operator commands.
+
+## External effects
+
+Database transactions cover database work supported by the dialect. HTTP calls, filesystem writes, and other external effects need idempotency and explicit recovery in your migration code.
+
+Plan for a handler that performs an external action and then fails before recording success. Give repeated requests stable identifiers and inspect the external system during reconciliation.
+
+A `down` handler is optional. Rollback generation requires it for every active migration selected for reversal. Write `down` only when you can explain what it restores, including the fate of data created after `up`.
+
+[Rollback and recovery](./guides/rollback-recovery) explains how Zenlev records compensation as a new migration.

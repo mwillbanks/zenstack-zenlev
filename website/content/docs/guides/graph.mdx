@@ -1,0 +1,66 @@
+---
+title: 'Dependency graph'
+description: 'Choose eligible work while retaining explicit prerequisites.'
+---
+
+`dependsOn` forms a directed acyclic graph. Each edge states that one change must complete before another becomes eligible. Independent changes can reach different deployment windows without assigning every file one global sequence.
+
+Every referenced ID must exist locally or in stored history. Zenlev validates the effective graph after supersedes rewriting.
+
+## Selection
+
+```sh
+bun run zenlev migrate apply --namespace predeploy --plan-only
+bun run zenlev migrate apply --namespace predeploy,deploy --plan-only
+bun run zenlev migrate apply --only <id>,<id> --plan-only
+bun run zenlev migrate apply --from <id> --to <id> --plan-only
+bun run zenlev migrate tree --format mermaid --show-supersedes
+```
+
+Selection uses the following bounds.
+
+| Option                      | Included migrations                     |
+| --------------------------- | --------------------------------------- |
+| `--from <id>`               | The bound migration and its descendants |
+| `--to <id>`                 | The bound migration and its ancestors   |
+| `--namespace <name>,<name>` | Migrations in any listed namespace      |
+| `--tags <tag>,<tag>`        | Migrations matching a listed tag        |
+| `--only <id>,<id>`          | The listed migration IDs                |
+
+Different filters intersect. A migration must meet every supplied filter category. For example, combining a `--to` bound with `--namespace predeploy` limits its ancestor set to that namespace.
+
+Pending dependencies outside the selection block execution. The planner retains your selected scope and reports which prerequisite needs attention.
+
+For a chain `A → B → C`, `--from B --to C` selects B and C. If A is pending, B remains blocked until you deliberately include A or apply it earlier. If A is already applied, its ledger record satisfies the prerequisite.
+
+## Deterministic order
+
+Eligible migrations execute in topological order. Independent nodes use lexical ID order. Execution within one apply run is sequential.
+
+Dependency freedom gives your deployment pipeline flexibility between valid plans. It does not imply that a single apply command executes branches concurrently.
+
+A plan is an inspection of current state. A real apply acquires the ledger lock, rereads history, rebuilds the plan, and verifies selected files. Review warnings and blockers again when the state changes.
+
+## Supersedes
+
+Superseding migrations replace future graph edges without rewriting the historical record. References follow supersedes transitively. Creation time chooses among competing superseders, followed by lexical ID for equal timestamps.
+
+Use this when a reviewed migration replaces an earlier definition or when generated compensation needs to become the current graph node. Supersedes metadata expresses graph replacement. Its migration handler must still perform the intended database work.
+
+Applied history remains available even when its source definition is superseded. A missing local file can therefore remain visible through the stored record.
+
+## Cross-namespace deployments
+
+A `postdeploy` migration can be a prerequisite for a later `predeploy` migration. Namespace names have no built-in ordering. Declare the relationship with `dependsOn` and inspect each deployment's plan.
+
+An unapplied prerequisite can prevent a stage from running even when its own namespace matches. Applied prerequisites can satisfy dependencies across namespace boundaries.
+
+Use [Staged deployments](./guides/deployments) for an expand, backfill, and contract example. Use [Namespaces and environments](./guides/namespaces) to distinguish deployment cohorts from database selection.
+
+## Failures in a branch
+
+The default apply behavior stops on failure. With `--continue-on-failure`, Zenlev can continue independent branches and skip blocked dependents.
+
+Transactional dialects require `--no-transaction` with that option. This gives up the shared transaction boundary and requires reconciliation of partial work.
+
+See [Rollback and recovery](./guides/rollback-recovery) before choosing that mode.

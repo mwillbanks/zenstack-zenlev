@@ -1,0 +1,107 @@
+---
+title: 'Command reference'
+description: 'Look up selection, execution, integrity, and recovery commands.'
+---
+
+Both `zenlev` and `zenstack-zenlev` invoke the same command service. Use `bun run zenlev <command>` from a project with the package installed.
+
+Run `zenlev --help` or `zenlev migrate apply --help` to inspect the installed version's accepted flags.
+
+## Global options
+
+| Option                                                        | Purpose                                                    |
+| ------------------------------------------------------------- | ---------------------------------------------------------- |
+| `--config <path>`                                             | Select a dedicated config file                             |
+| `--cwd <path>`                                                | Select the project working directory                       |
+| `--env <name>`                                                | Pass an environment name to the client factory and context |
+| `--schema <path>`                                             | Select the ZModel source                                   |
+| `--migrations-dir <path>`                                     | Override migration discovery location                      |
+| `--json`                                                      | Emit a structured result for automation                    |
+| `--store-location <schema\|database\|table>`                  | Choose ledger storage                                      |
+| `--store-schema-name <name>`, `--store-database-name <name>`  | Set the ledger namespace                                   |
+| `--store-table-name <name>`, `--store-lock-table-name <name>` | Override ledger table names                                |
+
+Hash and telemetry settings also have CLI overrides. See [Configuration](./reference/configuration) and [Plugins and telemetry](./reference/plugins-telemetry).
+
+## Schema work
+
+| Command                                                     | Purpose                                           |
+| ----------------------------------------------------------- | ------------------------------------------------- |
+| `db push --dry-run --sql`                                   | Inspect schema changes and SQL                    |
+| `db push --create-migration --name <name>`                  | Generate a migration from the schema comparison   |
+| `db push`                                                   | Execute the current change set                    |
+| `migrate create --name <name> --from-schema <path>`         | Generate from a previous ZModel to current ZModel |
+| `migrate create --name <name> --from-schema <path> --to-db` | Compare that source with the live database        |
+
+Use `--drop-missing-tables=apply|skip` when noninteractive schema work encounters absent-model tables. Use `--namespace <name>` to label a generated migration and `--format` to format it with Bun.
+
+Use `zen db pull` to introspect the database into ZModel. See [Schema changes](./guides/schema-changes) for the review workflow and supported comparisons.
+
+## Migration work
+
+| Command                                   | Purpose                                  |
+| ----------------------------------------- | ---------------------------------------- |
+| `migrate create --name <name> --empty`    | Create a TypeScript skeleton             |
+| `migrate apply --plan-only`               | Inspect eligible work and blockers       |
+| `migrate apply`                           | Execute the selected migrations          |
+| `migrate status`                          | Inspect stored and local migration state |
+| `migrate tree`                            | Print the dependency graph               |
+| `migrate rollback --id <id> --cascade`    | Generate dependent-first compensation    |
+| `migrate rollback --id <id> --compensate` | Generate compensation for one target     |
+
+For create, `--depends-on <id>,<id>` and `--supersedes <id>,<id>` set graph references.
+
+For apply, `--namespace <name>,<name>`, `--only <id>,<id>`, `--tags <tag>,<tag>`, `--from <id>`, and `--to <id>` intersect. Pending prerequisites outside the selection produce blockers. See [Dependency graph](./guides/graph#selection).
+
+For status, `--namespace` filters cohorts, `--mismatched-only` shows integrity problems, and `--show-resolved` distinguishes accepted alternate hashes.
+
+For tree, choose `--format text|mermaid` and optionally `--show-supersedes`. The `--namespace` filter accepts comma-separated values.
+
+### Transaction controls
+
+Apply uses a shared transaction on transactional DDL dialects by default. `--no-transaction` chooses durable per-attempt recording.
+
+`--continue-on-failure` continues independent branches and skips dependents blocked by a failed prerequisite. It requires `--no-transaction` on transactional dialects.
+
+MySQL DDL can commit implicitly. Review [Rollback and recovery](./guides/rollback-recovery) before running a plan that can leave partial changes.
+
+## Integrity and file management
+
+| Command                                     | Purpose                                                  |
+| ------------------------------------------- | -------------------------------------------------------- |
+| `migrate remove --id <id> --dry-run`        | Preview deletion of an unapplied file                    |
+| `migrate remove --id <id> --force`          | Delete an eligible file without interactive confirmation |
+| `migrate resolve --id <id> --hash <hash>`   | Accept the currently observed local hash                 |
+| `migrate reshape --id <id> --accept <hash>` | Add an accepted alternative hash                         |
+| `migrate reshape --id <id> --drop <hash>`   | Remove an accepted alternative hash                      |
+
+Real removal requires a configured database so Zenlev can protect recorded migrations. It also validates the effective graph. An offline preview can check the local graph.
+
+Resolve checks an optional supplied hash against the current file. It retains the executed hash. Reshape requires exactly one `--accept` or `--drop`. Supply `--actor` and `--reason` to identify the operator and decision.
+
+Hash acceptance records approval of bytes. Review the source change before accepting it.
+
+## Recovery
+
+`migrate recover` requires `--action`, `--actor`, `--reason`, and `--evidence`.
+
+| Action         | Additional required options                 |
+| -------------- | ------------------------------------------- |
+| `release-lock` | `--owner <observed-owner>`                  |
+| `applied`      | `--id <id> --attempt-id <observed-attempt>` |
+| `retry`        | `--id <id> --attempt-id <observed-attempt>` |
+
+Inspect and reconcile database state before recording recovery. See [Rollback and recovery](./guides/rollback-recovery).
+
+## Automation
+
+```sh
+bun run zenlev migrate apply --env staging --namespace predeploy --plan-only --json
+bun run zenlev db push --drop-missing-tables=skip --json
+```
+
+JSON results contain an outer `status` and `result`. Successful commands return exit code 0. Errors, blockers, failures, and partial execution return exit code 1.
+
+Human TTY output uses the cell renderer. Redirected output uses plain text. JSON output excludes progress frames and ANSI sequences.
+
+Apply `--dry-run` and `--plan-only` inspect work without calling migration handlers or initializing the ledger. Discovery still loads migration modules and configuration. Keep module-level code free of side effects.

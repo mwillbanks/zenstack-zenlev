@@ -1,0 +1,58 @@
+---
+title: 'Schema changes'
+description: 'Inspect a physical change set before choosing when to run it.'
+---
+
+Zenlev loads ZModel and its imports with ZenStack's language interfaces. It compares physical names, columns, supported defaults, indexes, keys, and relationships with the configured database.
+
+The resulting ordered change set drives SQL inspection, direct execution, and generated TypeScript migrations. This keeps the reviewed operations connected to the work you execute.
+
+## Inspect first
+
+```sh
+bun run zenlev db push --dry-run --sql
+bun run zenlev db push --create-migration --name add_projects --format
+```
+
+SQL output and dry runs inspect changes without executing the change set or creating a migration. Migration generation creates a reviewable TypeScript file. Direct `db push` executes the change set.
+
+Use generation when a schema change belongs to a deployment stage or needs a prerequisite such as a completed backfill. Review the generated metadata, namespace, dependencies, and handlers before applying it.
+
+Zenlev excludes its ledger and Prisma bookkeeping from schema changes. Views are excluded by default.
+
+Use `zen db pull` for introspection into ZModel.
+
+## Missing tables
+
+A live table absent from ZModel is a drop candidate within the selected schemas. Interactive users can confirm or skip each table.
+
+Automation and noninteractive file generation must choose a policy when candidates exist.
+
+```sh
+bun run zenlev db push --drop-missing-tables=skip
+bun run zenlev db push --create-migration --name remove_legacy --drop-missing-tables=apply
+```
+
+Inspect candidate names and dependent operations before choosing `apply`. Skipping a table also skips its dependent drop operations.
+
+The live database can change while an operator reviews the plan. A changed live plan after confirmation stops execution and requires a fresh review.
+
+## Schema-to-schema scaffolding
+
+Use `migrate create --from-schema <previous.zmodel>` to compare a previous ZModel with the current ZModel. Add `--to-db` to compare that source with the live database.
+
+```sh
+bun run zenlev migrate create --name expand_customer --from-schema ./previous.zmodel --namespace predeploy --format
+```
+
+A comparison can describe a structural change while a migration handler adds the data transformation needed to make that structure useful. Review both before deployment.
+
+Inverse steps are generated only when their semantics are known. Unsupported rewrites require a manually authored migration. Renames require an explicit reviewed migration because the comparison cannot infer intent from changed names.
+
+## Deployment and dialect limits
+
+Destructive changes produce warnings. Review generated code for application-level data requirements and external consumers.
+
+An application release may still read an old column after a new column appears. Schedule backfill and removal through [Staged deployments](./guides/deployments) and [Dependency graph](./guides/graph).
+
+SQLite, PostgreSQL, and MySQL have different DDL and type behavior. See the [Dialect examples](./dialects) before choosing transaction or rollback expectations.

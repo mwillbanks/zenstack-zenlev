@@ -1,7 +1,11 @@
 ---
 title: 'Bootstrap and cutover'
-description: 'Start a new database or adopt an existing Prisma-managed database.'
+description: 'Establish a verified starting state for existing and empty databases.'
 ---
+
+A migration ledger describes changes from a known starting state. Decide how each database reaches that state before switching its deployment runner.
+
+Zenlev can coexist with retained Prisma history while recording future Zenlev changes in its own ledger.
 
 ## Existing database
 
@@ -17,6 +21,8 @@ Zenlev starts a new ledger. Historical Prisma SQL files and checksums retain the
 
 A fresh empty Zenlev ledger on an existing database requires incremental changes. Running an initial create-all migration there would attempt to recreate existing objects.
 
+Record the verified baseline, cutover revision, and first Zenlev migration in your project's operating documentation. This gives future operators the starting state they need to interpret the new history.
+
 ## Empty database
 
 Keep a reviewed bootstrap path for new environments.
@@ -24,12 +30,20 @@ Keep a reviewed bootstrap path for new environments.
 For a fresh project, compare the initial ZModel against the empty database and generate an initial migration.
 
 ```sh
-bunx zenlev db push --dry-run --sql
-bunx zenlev db push --create-migration --name initial_schema --format
-bunx zenlev migrate apply --plan-only
-bunx zenlev migrate apply
+bun run zenlev db push --dry-run --sql
+bun run zenlev db push --create-migration --name initial_schema --format
+bun run zenlev migrate apply --plan-only
+bun run zenlev migrate apply
 ```
 
 For a project adopted after Prisma, provision the historical schema through your approved baseline or restore workflow, then run the new Zenlev ledger.
 
 Keep fresh-environment bootstrap and existing-environment cutover explicit in deployment documentation.
+
+## Repeat the workflow per environment
+
+Use an environment-aware factory to select the intended database. Verify its baseline before applying the same migration graph.
+
+Development, staging, and production can have different applied histories at a given moment. Their ledgers determine eligible work on each destination.
+
+Use [Namespaces and environments](./guides/namespaces) for destination selection and [Staged deployments](./guides/deployments) for release stages. Review dialect-specific connection setup in the [Dialect examples](./dialects).
