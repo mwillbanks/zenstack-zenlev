@@ -153,10 +153,21 @@ export function hashMigrationContent(
 }
 
 async function readRegularFile(filePath: string): Promise<Buffer> {
+  if (!(await lstat(filePath)).isFile()) {
+    throw new TypeError(`Migration is not a regular file: ${filePath}`)
+  }
   const file = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
-    if (!(await file.stat()).isFile())
+    const opened = await file.stat({ bigint: true })
+    const entry = await lstat(filePath, { bigint: true })
+    if (
+      !opened.isFile() ||
+      !entry.isFile() ||
+      opened.dev !== entry.dev ||
+      opened.ino !== entry.ino
+    ) {
       throw new TypeError(`Migration is not a regular file: ${filePath}`)
+    }
     return await file.readFile()
   } finally {
     await file.close()
