@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { dirname, extname, relative, resolve } from 'node:path'
+import { dirname, extname, relative, resolve, sep } from 'node:path'
 import { parseSync } from 'oxc-parser'
 
 type Token = { type: string; start: number; [key: string]: unknown }
@@ -101,7 +101,7 @@ export async function checkTimingFiles(entries: readonly string[]) {
   async function visit(file: string) {
     if (checked.has(file)) return
     checked.add(file)
-    const label = relative(root, file)
+    const label = relative(root, file).split(sep).join('/')
     if (fixtures.test(label)) {
       faults.push(label + ': Unit suites cannot import integration fixtures')
       return
@@ -122,6 +122,7 @@ if (import.meta.main) {
   const entries = Array.from(
     new Bun.Glob('**/*.{test,spec}.{ts,tsx,js,mjs}').scanSync(resolve(root, 'test')),
   )
+    .map((entry) => entry.split(sep).join('/'))
     .filter((entry) => !entry.startsWith('integration/') && !entry.startsWith('.zenlev-'))
     .map((entry) => resolve(root, 'test', entry))
   const faults = await checkTimingFiles(entries)
