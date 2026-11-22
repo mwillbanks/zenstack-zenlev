@@ -1,0 +1,4 @@
+{
+  "title": "Dialect examples",
+  "pages": ["index", "sqlite", "postgresql", "mysql"]
+}

@@ -1,24 +1,43 @@
 ---
-title: 'Zenlev'
-description: 'TypeScript migrations for ZenStack V3 and Kysely.'
+title: 'Zenlev documentation'
+description: 'Plan TypeScript database migrations around the way your application ships.'
 ---
 
-Zenlev runs migration code through your configured ZenStack client. Explicit dependencies form a graph, and namespaces select deployment stages.
+import { DeploymentTimeline, MigrationGraph } from '../../src/components/migration-diagrams'
 
-Start with [Quick start](./quick-start), then read [Migration files](./migrations) and [Dependency graph](./graph).
+## Why Zenlev exists
 
-## A deliberate migration workflow
+Application releases and database changes rarely fit into one linear sequence. A rolling deployment can leave two application versions writing to the same database. A new column may need to exist before either version uses it. A backfill can run after compatible writers are ready. Removing the old column may wait through a separate release and rollback window.
 
-1. Create a TypeScript migration.
-2. Declare its prerequisites and namespace.
-3. Inspect status and the execution plan.
-4. Apply the selected stage.
-5. Review compensation or recovery when an operation fails.
+Zenlev lets you keep those changes in separate TypeScript migrations. Declare which work must happen first, then let your release pipeline decide when to run each eligible group. Independent changes can move between deployment windows without rewriting migrations or their applied history.
 
-The CLI aliases `zenlev` and `zenstack-zenlev` share the same command service. The [programmatic API](./api) uses that service too.
+<DeploymentTimeline />
 
-## Database connections
+## Explicit dependencies leave room to schedule work
 
-Zenlev accepts your existing ZenStack client or a factory that receives the selected environment. The underlying Kysely dialect controls the database driver.
+Imagine replacing a customer's email column. Adding the new column makes both the backfill and index creation eligible. Either can run first when your application permits it. Retiring the old column waits for both.
 
-See [SQLite](./sqlite), [PostgreSQL](./postgresql), and [MySQL](./mysql) for setup and transaction behavior.
+<MigrationGraph />
+
+A migration's `dependsOn` entries are requirements. Namespace and tag filters select work, while the ledger shows which requirements a destination has already met. If a pending prerequisite falls outside the selection, Zenlev reports the blocker before invoking migration handlers.
+
+<span id="a-deliberate-migration-workflow" className="scroll-mt-24" />
+
+## How a migration runs
+
+1. **Connect.** Zenlev uses your configured ZenStack V3 client or Kysely adapter. An environment-aware factory can select the destination.
+2. **Plan.** Zenlev reads migration metadata and ledger history, builds the effective graph, and orders eligible work by dependency.
+3. **Inspect.** Review selected IDs, warnings, and blockers with `migrate apply --plan-only`. Use status and tree to see the current history and dependencies.
+4. **Apply.** Zenlev acquires the ledger lock, rebuilds the plan, and verifies selected entry-file hashes. Database work and ledger updates share a transaction where supported.
+5. **Respond.** Generate a reviewable compensation migration for an unwanted change. Reconcile an interrupted attempt before authorizing a retry.
+
+<span id="database-connections" className="scroll-mt-24" />
+
+Namespaces label work within a ledger. Use `--env` to supply an environment to the client factory. [Namespaces and environments](./guides/namespaces) shows how both choices fit into staging and production runs.
+
+## Find the right page
+
+- [Quick start](./guides/quick-start) runs your first migration. [Staged deployments](./guides/deployments) walks through the complete column replacement.
+- [Guides](./guides) cover authoring, selection, schema changes, rollback, recovery, and adopting Zenlev.
+- [Reference](./reference) covers CLI syntax, configuration, the typed API, plugins, and telemetry.
+- [Dialect examples](./dialects) show SQLite, PostgreSQL, and MySQL client setup and transaction behavior.

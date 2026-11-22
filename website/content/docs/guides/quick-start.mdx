@@ -1,0 +1,81 @@
+---
+title: 'Quick start'
+description: 'Connect your client, write a migration, and inspect its first deployment.'
+---
+
+Zenlev runs TypeScript migrations through your configured database connection. This walkthrough creates one additive change in a `predeploy` namespace.
+
+Read [Staged deployments](./guides/deployments) for the larger sequence that includes application releases and data backfills.
+
+## Install
+
+Use Bun 1.4.4 or later in a ZenStack V3 project.
+
+```sh
+bun add -d @mwillbanks/zenstack-zenlev
+```
+
+Keep the project's ZenStack ORM and Kysely versions compatible with the package peer dependencies.
+
+## Connect the client
+
+Create `zenlev.config.ts` beside your project package manifest.
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+import { db } from './db'
+
+export default defineConfig({
+  client: db,
+  migrationsDir: 'migrations',
+})
+```
+
+Zenlev borrows this client. Your application owns its lifecycle. Use an [owned factory](./reference/configuration#environment-aware-client-factory) when the CLI should close connections itself.
+
+For connection examples, see [SQLite](./dialects/sqlite), [PostgreSQL](./dialects/postgresql), or [MySQL](./dialects/mysql).
+
+## Create the migration
+
+```sh
+bun run zenlev migrate create --name add_categories --namespace predeploy --empty
+```
+
+Open the generated file. Keep its generated ID and UTC creation timestamp. Implement `up` and, when reversible, `down`.
+
+```ts
+import type { MigrationCtx } from '@mwillbanks/zenstack-zenlev'
+
+export async function up(ctx: MigrationCtx) {
+  await ctx.db.schema
+    .createTable('categories')
+    .addColumn('id', 'integer', (column) => column.primaryKey())
+    .addColumn('name', 'text', (column) => column.notNull())
+    .execute()
+}
+
+export async function down(ctx: MigrationCtx) {
+  await ctx.db.schema.dropTable('categories').execute()
+}
+```
+
+Keep the generated `meta` export in the same file. Its namespace labels when you intend to run the migration. The deployment pipeline chooses that time explicitly.
+
+Commit reviewed migration files through your normal project workflow. Use [Migration files](./guides/migrations) to add prerequisites and declared warnings.
+
+## Inspect and apply
+
+```sh
+bun run zenlev migrate status
+bun run zenlev migrate apply --namespace predeploy --plan-only
+bun run zenlev migrate apply --namespace predeploy
+bun run zenlev migrate tree --show-supersedes
+```
+
+The plan shows eligible changes, warnings, and blockers before handlers run. An unapplied prerequisite outside `predeploy` blocks its dependent. Inspect the dependency and apply its intended stage before retrying.
+
+A successful run records each migration's executed hash. Subsequent runs use the ledger to skip changes already applied.
+
+For a different database environment, pass `--env staging` to a factory that routes that environment to its connection. See [Namespaces and environments](./guides/namespaces).
+
+Use [Bootstrap and cutover](./guides/adoption) to prepare a new database or adopt an existing Prisma-managed database.

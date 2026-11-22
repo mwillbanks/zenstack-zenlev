@@ -1,19 +1,4 @@
 {
   "title": "Documentation",
-  "pages": [
-    "index",
-    "quick-start",
-    "configuration",
-    "migrations",
-    "graph",
-    "commands",
-    "schema-changes",
-    "rollback-recovery",
-    "api",
-    "sqlite",
-    "postgresql",
-    "mysql",
-    "adoption",
-    "plugins-telemetry"
-  ]
+  "pages": ["index", "guides", "reference", "dialects"]
 }

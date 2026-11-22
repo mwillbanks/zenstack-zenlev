@@ -5,6 +5,7 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import mdx from 'fumadocs-mdx/vite'
 import { nitro } from 'nitro/vite'
 import { defineConfig } from 'vite'
+import { legacyDocPaths } from './src/lib/doc-paths'
 
 const base = process.env.VITE_BASE_PATH ?? '/zenstack-zenlev/'
 
@@ -14,7 +15,14 @@ export default defineConfig({
     mdx(),
     tailwindcss(),
     tanstackStart({
-      pages: [{ path: '/' }, { path: '/docs' }, { path: '/api/search' }],
+      pages: [
+        { path: '/' },
+        { path: '/docs' },
+        { path: '/api/search' },
+        ...Object.keys(legacyDocPaths).map((slug) => ({
+          path: base.replace(/\/$/, '') + '/docs/' + slug,
+        })),
+      ],
       spa: { enabled: true, prerender: { enabled: true, crawlLinks: true } },
     }),
     react(),

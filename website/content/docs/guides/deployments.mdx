@@ -1,0 +1,115 @@
+---
+title: 'Staged deployments'
+description: 'Coordinate schema expansion, backfills, and cleanup across release checkpoints.'
+---
+
+import { DeploymentTimeline, MigrationGraph } from '../../../src/components/migration-diagrams'
+
+A release can span several database changes. Some must precede application deployment. Others need the new application to run first. Cleanup can wait until old application versions and rollback windows have passed.
+
+Give these changes separate migration files. Assign namespaces to the groups your pipeline invokes, then declare database prerequisites by migration ID.
+
+<DeploymentTimeline />
+
+## Plan an email-column replacement
+
+Suppose the application currently reads `email` and will move to `contact_email`. A safe release can use these changes.
+
+| Migration                    | Namespace    | Prerequisites                 | Readiness condition                                      |
+| ---------------------------- | ------------ | ----------------------------- | -------------------------------------------------------- |
+| Add nullable `contact_email` | `predeploy`  | Existing customer table       | Old application remains compatible                       |
+| Create its supporting index  | `predeploy`  | New column migration          | Review index cost and dialect restrictions               |
+| Backfill `contact_email`     | `deploy`     | New column migration          | Deployed application writes both columns                 |
+| Remove `email`               | `postdeploy` | Index and backfill migrations | Traffic uses the new column and old writers have stopped |
+
+<MigrationGraph />
+
+The graph captures database prerequisites. Pipeline checks enforce the application readiness conditions in the last column. Namespace spelling has no built-in release ordering.
+
+## Create the migration files
+
+Generate the expansion first.
+
+```sh
+bun run zenlev migrate create --name add_contact_email --namespace predeploy --empty
+```
+
+Read its generated `meta.id`. Use that ID when creating its direct dependents.
+
+```sh
+bun run zenlev migrate create --name index_contact_email --namespace predeploy --depends-on <expand-id> --empty
+bun run zenlev migrate create --name backfill_contact_email --namespace deploy --depends-on <expand-id> --empty
+bun run zenlev migrate create --name retire_email --namespace postdeploy --depends-on <index-id>,<backfill-id> --empty
+```
+
+Replace angle-bracket placeholders with the generated migration IDs before running these commands. Edit each file's `up` handler. Give each operation a `down` handler only when its reversal has understood semantics. Keep application compatibility and backfill batching requirements in the migration review.
+
+For long backfills, consider smaller dependency-linked migrations with restartable data operations. A migration handler can perform arbitrary TypeScript work. Its author controls data checks and batching.
+
+## Apply expansion before deployment
+
+Choose the destination through your project factory and inspect the graph and plan.
+
+```sh
+bun run zenlev --env staging migrate tree
+bun run zenlev --env staging migrate apply --namespace predeploy --plan-only
+bun run zenlev --env staging migrate apply --namespace predeploy
+```
+
+Review which IDs are included. The namespace selects all pending migrations carrying that label. Add graph bounds, explicit IDs, or tags when the release requires a narrower selection.
+
+A pending prerequisite outside the selected scope blocks application. Apply the prerequisite at its own checkpoint or revise the selected scope after review.
+
+## Deploy compatible application code
+
+Deploy code that understands both columns and writes both values. Wait for the readiness check appropriate to your rollout.
+
+Run the data migration when the application can maintain consistency during the backfill.
+
+```sh
+bun run zenlev --env staging migrate apply --namespace deploy --plan-only
+bun run zenlev --env staging migrate apply --namespace deploy
+```
+
+Verify row counts and the application's read behavior. Switch reads to `contact_email` through your application release process.
+
+## Retire old storage after verification
+
+Confirm that old application instances and background workers have stopped using `email`. Decide whether the rollback window has closed.
+
+```sh
+bun run zenlev --env staging migrate apply --namespace postdeploy --plan-only
+bun run zenlev --env staging migrate apply --namespace postdeploy
+```
+
+The cleanup migration's dependencies require the recorded backfill and index. Your release process must establish the remaining application conditions before invoking cleanup.
+
+Repeat the reviewed sequence against production with `--env production`. Your factory must select its production connection. Each destination keeps its own applied history.
+
+## Adjust the schedule while preserving dependencies
+
+Independent work can move between release checkpoints when application compatibility allows it.
+
+| Schedule                                | First      | Second                              | Third                               | Last                           |
+| --------------------------------------- | ---------- | ----------------------------------- | ----------------------------------- | ------------------------------ |
+| Build the index before deploying        | Add column | Build index                         | Deploy compatible code and backfill | Retire old column after checks |
+| Delay the index to a maintenance window | Add column | Deploy compatible code and backfill | Build index                         | Retire old column after checks |
+
+The second schedule requires the application to work acceptably while the index is pending. Use explicit IDs to preview the expansion on its own and to preview indexing in the later window. Set `EXPAND_ID` and `INDEX_ID` to the generated IDs.
+
+```sh
+bun run zenlev --env staging migrate apply --only "$EXPAND_ID" --plan-only
+bun run zenlev --env staging migrate apply --only "$INDEX_ID" --plan-only
+```
+
+Preview the index after the expansion is applied. Until then, the pending prerequisite blocks that selection. Cleanup still requires the index and backfill in either schedule.
+
+Use one comma-separated namespace selection to inspect several groups together.
+
+```sh
+bun run zenlev --env staging migrate apply --namespace predeploy,deploy --plan-only
+```
+
+This combines the selected groups in dependency order. It also includes every pending migration matching those groups and any other selection bounds. Inspect the result before using a combined apply.
+
+Read [Dependency graph](./guides/graph) for bounds and tie-breaking, and [Rollback and recovery](./guides/rollback-recovery) for failure handling.

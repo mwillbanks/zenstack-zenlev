@@ -1,0 +1,14 @@
+---
+title: 'Dialect examples'
+description: 'Connect Zenlev to the same SQLite, PostgreSQL, or MySQL database your application uses.'
+---
+
+Zenlev uses the connection supplied by your project. Each example shows a ZenStack V3 client setup and explains what that database can commit together with a ledger update.
+
+| Example                             | Default ledger             | Schema changes                 |
+| ----------------------------------- | -------------------------- | ------------------------------ |
+| [SQLite](./dialects/sqlite)         | Prefixed SQLite tables     | Transactional                  |
+| [PostgreSQL](./dialects/postgresql) | Separate `zenlev` schema   | Transactional for ordinary DDL |
+| [MySQL](./dialects/mysql)           | Separate `zenlev` database | DDL can commit implicitly      |
+
+See [configuration](./reference/configuration) for ledger locations and [rollback and recovery](./guides/rollback-recovery) for failed attempts.

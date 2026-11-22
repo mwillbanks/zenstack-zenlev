@@ -8,7 +8,7 @@
   TypeScript migrations for ZenStack V3.
 </p>
 
-Write schema and data migrations in TypeScript. Order them with explicit dependencies and select deployment stages by namespace or tag. Zenlev records each successful migration with its executed hash.
+Write schema and data migrations in TypeScript. Use dependencies to keep prerequisite changes in order. Use namespaces or tags to select work before, during, or after a deployment. Zenlev records each successful migration with its executed hash.
 
 Use Zenlev with an existing ZenStack V3 client or a standalone Kysely adapter. Continue to use `zen db pull` for introspection.
 
@@ -45,4 +45,4 @@ Preview the database changes for your current ZModel with `zenlev db push --sql`
 
 For an existing Prisma-managed project, verify the current schema and retire the old migration job. Preserve the Prisma ledger. Start a separate Zenlev history for future changes. The adoption guide also covers clean database bootstrap.
 
-[Read the documentation](https://mwillbanks.github.io/zenstack-zenlev/) · [Contributing](./CONTRIBUTING.md) · [Security](./SECURITY.md) · [Changelog](./CHANGELOG.md)
+[Read the documentation](https://mwillbanks.github.io/zenstack-zenlev/docs/) · [Contributing](./CONTRIBUTING.md) · [Security](./SECURITY.md) · [Changelog](./CHANGELOG.md)

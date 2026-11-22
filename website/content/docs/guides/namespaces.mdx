@@ -1,0 +1,115 @@
+---
+title: 'Namespaces and environments'
+description: 'Select migration groups and connect each invocation to the intended destination.'
+---
+
+Namespaces and environments answer different questions. A namespace labels the work to select. The selected environment reaches your client factory and migration context, where your project determines the destination connection.
+
+| Setting                     | Purpose                                                | Example                       |
+| --------------------------- | ------------------------------------------------------ | ----------------------------- |
+| Migration `meta.namespace`  | Assign a migration to one named group                  | `predeploy`                   |
+| Apply `--namespace`         | Select matching groups from the effective graph        | `predeploy,deploy`            |
+| Invocation `--env`          | Pass an environment name to configuration and handlers | `staging`                     |
+| Configured client and store | Determine the actual database and ledger               | Staging PostgreSQL connection |
+
+## Label migration groups
+
+A migration has one namespace. Generated files default to `default` when creation omits `--namespace`.
+
+```sh
+bun run zenlev migrate create --name add_contact_email --namespace predeploy --empty
+```
+
+The generated metadata includes the chosen group.
+
+```ts
+export const meta = {
+  id: 'a12345678901234567890123',
+  name: 'add_contact_email',
+  namespace: 'predeploy',
+  createdAt: '2026-11-22T12:00:00.000Z',
+}
+```
+
+Use labels that match your workflow. Deployment checkpoints, such as `predeploy`, `deploy`, and `postdeploy`, keep different release activities independently selectable. Team or service labels can also group work when that better matches your ownership model.
+
+## Select one or several namespaces
+
+```sh
+bun run zenlev migrate status --namespace predeploy
+bun run zenlev migrate tree --namespace predeploy,deploy
+bun run zenlev migrate apply --namespace predeploy,deploy --plan-only
+```
+
+The CLI accepts comma-separated lists for apply, status, and tree. The programmatic API accepts an array.
+
+```ts
+const plan = await zenlev.migrate.apply({
+  namespace: ['predeploy', 'deploy'],
+  planOnly: true,
+})
+```
+
+Omitting the filter considers all namespaces. Namespace filters intersect `--from`, `--to`, `--only`, and `--tags` filters where those options are supported. Within a selection, dependencies determine execution order.
+
+## Keep prerequisites visible across groups
+
+Migration IDs and dependency references are global within a ledger. A migration in `postdeploy` can depend on one in `deploy`. A later release's `predeploy` migration can depend on that earlier cleanup.
+
+If the dependency is already applied, the selected migration can proceed. If it is pending and excluded by selection, the plan reports a `PENDING_PREREQUISITE` blocker.
+
+Inspect the complete graph, then review the intended stage.
+
+```sh
+bun run zenlev migrate tree
+bun run zenlev migrate apply --namespace postdeploy --plan-only
+```
+
+Apply prerequisites through the appropriate release checkpoint. Namespace selection preserves the declared graph relationships.
+
+## Choose the destination with an environment-aware factory
+
+Configure a factory when the same migration files run against several destinations.
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+import { createClientForEnvironment } from './db'
+
+export default defineConfig({
+  createClient: async ({ name, cwd }) => {
+    const client = await createClientForEnvironment(name, cwd)
+    return {
+      client,
+      dispose: () => client.$disconnect(),
+    }
+  },
+  namespaces: {
+    predeploy: { description: 'Compatible schema expansion' },
+    deploy: { description: 'Data transitions after application readiness' },
+    postdeploy: { description: 'Cleanup after traffic and rollback checks' },
+  },
+})
+```
+
+Here `createClientForEnvironment` is your project-owned helper. It must validate the environment name and construct the correct configured ZenStack client. Consult the [dialect examples](./dialects) for connection setup.
+
+```sh
+bun run zenlev --env staging migrate apply --namespace predeploy --plan-only
+bun run zenlev --env production migrate apply --namespace predeploy --plan-only
+```
+
+Both commands select the same namespace. The factory receives `staging` or `production` and the effective working directory. Migration handlers receive those values through `ctx.env.name` and `ctx.env.cwd`.
+
+A supplied `client` remains the supplied connection when you change `--env`. Your factory or handler must implement any environment-dependent behavior. Zenlev passes the environment without modifying caller process globals.
+
+## Understand history and isolation
+
+Namespaces share the configured ledger and lock. A migration ID identifies one recorded history entry across all groups in that ledger. Assign globally unique IDs and keep a recorded migration's identity stable.
+
+Use destination-specific connections and ledger locations for staging and production histories. Namespace labels alone do not create databases, partitions, access controls, or independent execution histories. You can use environment names as namespace labels for explicitly selected environment-specific work, while the configured client still determines where it runs.
+
+The `namespaces` configuration map documents descriptions. The runtime currently does not validate namespace membership or derive selections from that map. Metadata and command selections drive behavior.
+
+For rollback generation, `--namespace` assigns the generated superseding migration's group. Rollback locates its target by the globally unique `--id`. Review the target and the generated file before applying it.
+
+Read [Staged deployments](./guides/deployments) for a complete release sequence and [Configuration](./reference/configuration) for connection ownership and path precedence.

@@ -1,0 +1,98 @@
+---
+title: 'Programmatic API'
+description: 'Integrate the shared command service into deployment code.'
+---
+
+`createZenlev` loads project configuration and exposes the service used by both CLI aliases. Use it when deployment code needs structured plans, custom confirmation, or typed migration context.
+
+```ts
+import { createZenlev } from '@mwillbanks/zenstack-zenlev'
+import { db } from './db'
+
+const zenlev = await createZenlev({ client: db, migrationsDir: 'migrations' })
+
+try {
+  const preview = await zenlev.migrate.apply({
+    namespace: ['predeploy'],
+    planOnly: true,
+  })
+  if (preview.plan.blockers.length > 0) {
+    throw new Error(preview.plan.blockers.map((blocker) => blocker.message).join('\n'))
+  }
+
+  const result = await zenlev.migrate.apply({ namespace: ['predeploy'] })
+  if (result.status !== 'ok') {
+    throw new Error('Migration apply requires operator review')
+  }
+} finally {
+  await zenlev.close()
+}
+```
+
+The real apply rebuilds its plan under the ledger lock. The preview is a review point for the deployment.
+
+`close()` waits for in-flight command work and disposes factory-owned resources once. A supplied client stays under the caller's ownership.
+
+## Command methods
+
+| Method               | Main input                                           | Result                                        |
+| -------------------- | ---------------------------------------------------- | --------------------------------------------- |
+| `db.push()`          | Inspection, generation, and drop options             | Change set, status, and optional migration    |
+| `migrate.create()`   | Name, namespace, dependencies, and source comparison | Migration identity                            |
+| `migrate.apply()`    | Selection and transaction options                    | Plan and per-migration outcomes               |
+| `migrate.status()`   | Namespace and integrity filters                      | Status entries                                |
+| `migrate.tree()`     | Namespace, format, and supersedes options            | Text or Mermaid string                        |
+| `migrate.rollback()` | Target ID and explicit mode                          | Reversal set and optional generated migration |
+| `migrate.remove()`   | IDs or scope, preview, and confirmation              | Selected migration identities                 |
+| `migrate.resolve()`  | ID, optional current hash, actor, and reason         | Accepted current hash                         |
+| `migrate.reshape()`  | ID and accepted hash to add or drop                  | Hash update                                   |
+| `migrate.recover()`  | Exact observed lock or attempt and evidence          | Completion                                    |
+
+CLI comma-separated lists become arrays in API options. Apply, status, and tree use `namespace: ['predeploy', 'deploy']`. Authoring uses one `namespace` string.
+
+Rollback uses `mode: 'cascade' | 'compensate'`. See [Rollback and recovery](./guides/rollback-recovery) for its prerequisites and recovery input shapes.
+
+Apply returns `status: 'planned' | 'ok' | 'failed' | 'partial'`. Inspect `plan.blockers`, `plan.warnings`, and `migrations` before advancing the deployment.
+
+## Typed migrations
+
+Use `zenlev.defineMigration` with your configured service to infer its client and plugin context.
+
+```ts
+export const migration = zenlev.defineMigration({
+  meta: {
+    id: 'a12345678901234567890123',
+    name: 'prepare_release',
+    namespace: 'predeploy',
+    createdAt: '2026-11-22T12:00:00.000Z',
+  },
+  async up(ctx) {
+    ctx.reporter.info('Preparing release')
+    await ctx.db.schema
+      .createTable('release_marker')
+      .addColumn('id', 'integer', (column) => column.primaryKey())
+      .execute()
+  },
+})
+
+export const { meta, up } = migration
+```
+
+The example assumes the configured `zenlev` service above. Discovered migration files export `meta` and `up`, with optional `down`. See [Migration files](./guides/migrations).
+
+## Standalone Kysely
+
+```ts
+import { createKyselyAdapter, createZenlev } from '@mwillbanks/zenstack-zenlev'
+import { kysely } from './database'
+
+const zenlev = await createZenlev({
+  adapter: createKyselyAdapter(kysely, 'postgresql'),
+})
+```
+
+The adapter uses the supplied Kysely instance. Declare the database dialect explicitly. Migration context exposes that query builder through `ctx.db.kysely` and its schema builder through `ctx.db.schema`.
+
+Use the context builders inside handlers so transactional work and ledger transitions share the configured transaction boundary.
+
+See [Namespaces and environments](./guides/namespaces) for selection and routing, and [Plugins and telemetry](./reference/plugins-telemetry) for extension points.

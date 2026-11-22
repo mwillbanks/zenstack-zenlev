@@ -22,10 +22,10 @@ function Home() {
               each deployment, and run with the client you already use.
             </p>
             <div className="hero-actions">
-              <Link className="primary-link" to="/docs/$" params={{ _splat: 'quick-start' }}>
+              <Link className="primary-link" to="/docs/$" params={{ _splat: 'guides/quick-start' }}>
                 Start building <ArrowUpRight size={18} />
               </Link>
-              <Link className="secondary-link" to="/docs/$" params={{ _splat: 'graph' }}>
+              <Link className="secondary-link" to="/docs/$" params={{ _splat: 'guides/graph' }}>
                 Explore the graph <GitBranch size={18} />
               </Link>
             </div>
@@ -128,7 +128,7 @@ function Home() {
           <p>
             Start with a migration, inspect its plan, then apply the stages your deployment needs.
           </p>
-          <Link className="primary-link" to="/docs/$" params={{ _splat: 'commands' }}>
+          <Link className="primary-link" to="/docs/$" params={{ _splat: 'reference/commands' }}>
             Read the command reference <ArrowUpRight size={18} />
           </Link>
         </section>
