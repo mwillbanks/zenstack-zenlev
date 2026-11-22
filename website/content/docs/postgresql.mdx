@@ -1,0 +1,23 @@
+---
+title: 'PostgreSQL'
+description: "Reuse the project's configured pool and ZenStack client."
+---
+
+```ts
+import { ZenStackClient } from '@zenstackhq/orm'
+import { PostgresDialect } from '@zenstackhq/orm/dialects/postgres'
+import { Pool } from 'pg'
+import { schema } from './zenstack/schema'
+
+export const db = new ZenStackClient(schema, {
+  dialect: new PostgresDialect({
+    pool: new Pool({ connectionString: process.env.DATABASE_URL }),
+  }),
+})
+```
+
+Use this client in `defineConfig({ client: db })`, or construct it in an owned factory.
+
+The default ledger lives in the `zenlev` schema. Grant the migration connection permission to create and use it. Choose an explicit table store when your environment requires it.
+
+PostgreSQL supports transactional DDL for ordinary schema operations. Operations such as concurrent index creation need a deliberately non-transactional migration. Review `--no-transaction` warnings and prepare recovery before running those operations.

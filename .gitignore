@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage/
+release-artifacts/
+test/.zenlev-*
+*.tgz
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.website/

@@ -1,0 +1,24 @@
+---
+title: 'Zenlev'
+description: 'TypeScript migrations for ZenStack V3 and Kysely.'
+---
+
+Zenlev runs migration code through your configured ZenStack client. Explicit dependencies form a graph, and namespaces select deployment stages.
+
+Start with [Quick start](./quick-start), then read [Migration files](./migrations) and [Dependency graph](./graph).
+
+## A deliberate migration workflow
+
+1. Create a TypeScript migration.
+2. Declare its prerequisites and namespace.
+3. Inspect status and the execution plan.
+4. Apply the selected stage.
+5. Review compensation or recovery when an operation fails.
+
+The CLI aliases `zenlev` and `zenstack-zenlev` share the same command service. The [programmatic API](./api) uses that service too.
+
+## Database connections
+
+Zenlev accepts your existing ZenStack client or a factory that receives the selected environment. The underlying Kysely dialect controls the database driver.
+
+See [SQLite](./sqlite), [PostgreSQL](./postgresql), and [MySQL](./mysql) for setup and transaction behavior.

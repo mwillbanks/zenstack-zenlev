@@ -1,0 +1,101 @@
+{
+  "name": "@mwillbanks/zenstack-zenlev",
+  "version": "0.1.0",
+  "description": "A Bun-native migration system for ZenStack V3 with a reusable Kysely migration engine.",
+  "type": "module",
+  "packageManager": "bun@1.4.4",
+  "license": "MIT",
+  "author": "Mike Willbanks",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mwillbanks/zenstack-zenlev.git"
+  },
+  "homepage": "https://mwillbanks.github.io/zenstack-zenlev/",
+  "bugs": {
+    "url": "https://github.com/mwillbanks/zenstack-zenlev/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "bin": {
+    "zenstack-zenlev": "./dist/cli.js",
+    "zenlev": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "logo.svg",
+    "LICENSE"
+  ],
+  "scripts": {
+    "format": "bun fmt .",
+    "format:check": "bun fmt --check .",
+    "verify": "bun run format:check && bun check && bun run lint && bun test --bail",
+    "verify:coverage": "bun run format:check && bun check && bun run lint && bun run test:coverage",
+    "lint": "oxlint src test scripts && bun scripts/check-unit-timing.ts",
+    "test": "bun test --bail",
+    "test:coverage": "bun test --coverage --bail --coverage-reporter=text --coverage-reporter=lcov && bun scripts/check-coverage.ts",
+    "build": "bun scripts/build.ts",
+    "pack:check": "bun scripts/pack-check.ts",
+    "prepack": "bun run build",
+    "release": "release-it"
+  },
+  "dependencies": {
+    "@mwillbanks/tuil": "1.0.3",
+    "@mwillbanks/tuil-cell": "1.0.3",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.219.0",
+    "@opentelemetry/resources": "2.8.0",
+    "@opentelemetry/sdk-trace-base": "2.8.0",
+    "@paralleldrive/cuid2": "3.3.0",
+    "@zenstackhq/language": "3.10.3",
+    "react": "19.3.1"
+  },
+  "peerDependencies": {
+    "@zenstackhq/orm": ">=3.10.0 <4",
+    "kysely": ">=0.29.0 <0.30.0"
+  },
+  "peerDependenciesMeta": {
+    "@zenstackhq/orm": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@release-it/conventional-changelog": "12.0.2",
+    "@types/bun": "1.4.4",
+    "@types/pg": "8.23.1",
+    "@zenstackhq/orm": "3.10.3",
+    "@zenstackhq/schema": "3.10.3",
+    "conventional-changelog-conventionalcommits": "10.4.0",
+    "kysely": "0.29.0",
+    "mysql2": "3.24.6",
+    "oxc-parser": "0.159.0",
+    "oxlint": "1.94.0",
+    "pg": "8.23.1",
+    "release-it": "21.1.2",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "bun": ">=1.4.4",
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "bun",
+    "database",
+    "kysely",
+    "migrations",
+    "zenstack",
+    "zenstack-v3"
+  ]
+}

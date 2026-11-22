@@ -1,0 +1,132 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: Semver increment or explicit version
+        default: patch
+        required: true
+        type: string
+      release_tag:
+        description: Existing exact tag for publication recovery
+        default: ''
+        type: string
+      dry_run:
+        description: Qualify without publishing
+        default: true
+        required: true
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: zenlev
+          POSTGRES_PASSWORD: zenlev
+          POSTGRES_DB: zenlev_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U zenlev -d zenlev_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: zenlev
+          MYSQL_DATABASE: zenlev_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pzenlev"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      ZENLEV_TEST_POSTGRES_URL: postgresql://zenlev:zenlev@127.0.0.1:5432/zenlev_test
+      ZENLEV_TEST_MYSQL_URL: mysql://root:zenlev@127.0.0.1:3306/zenlev_test
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.release_tag || 'main' }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '26'
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Qualify documentation
+        working-directory: website
+        run: bun install --frozen-lockfile --ignore-scripts && bun run typecheck && bun run lint && bun run build && bun run verify:build
+      - name: Prepare release
+        if: inputs.release_tag == ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INCREMENT: ${{ inputs.increment }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "$DRY_RUN" = "true" ]; then
+            bun run release "$INCREMENT" --ci --dry-run
+          else
+            bun run release "$INCREMENT" --ci
+            bun -e 'console.log("RELEASE_TAG=v" + (await Bun.file("package.json").json()).version)' >> "$GITHUB_ENV"
+          fi
+      - name: Verify exact release revision
+        if: inputs.release_tag != '' || !inputs.dry_run
+        uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const {execFileSync}=require('node:child_process');
+            const manifest=require(process.cwd()+'/package.json');
+            const tag=process.env.RELEASE_TAG;
+            if(tag!=='v'+manifest.version || manifest.name!=='@mwillbanks/zenstack-zenlev') throw Error('Release identity differs');
+            const git=(...args)=>execFileSync('git',args,{encoding:'utf8'}).trim();
+            if(git('rev-parse','HEAD')!==git('rev-parse',tag+'^{commit}')) throw Error('Checkout differs from tag');
+            git('merge-base','--is-ancestor','HEAD','origin/main');
+            const {data:release}=await github.rest.repos.getReleaseByTag({...context.repo,tag});
+            if(release.draft) throw Error('Release remains draft');
+      - run: bun run verify:coverage
+      - run: bun run build
+      - run: bun run pack:check --output release-artifacts
+      - name: Check registry integrity
+        id: archive
+        uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const fs=require('node:fs');
+            const {createHash}=require('node:crypto');
+            const manifest=require(process.cwd()+'/package.json');
+            const files=fs.readdirSync('release-artifacts').filter(name=>name.endsWith('.tgz'));
+            if(files.length!==1) throw Error('Expected exactly one qualified tarball');
+            const path='release-artifacts/'+files[0];
+            const integrity='sha512-'+createHash('sha512').update(fs.readFileSync(path)).digest('base64');
+            const response=await fetch('https://registry.npmjs.org/'+encodeURIComponent(manifest.name)+'/'+manifest.version);
+            if(!response.ok && response.status!==404) throw Error('Registry lookup failed: '+response.status);
+            if(response.ok && (await response.json()).dist?.integrity!==integrity) throw Error('Published version differs from archive');
+            core.setOutput('publish',String(response.status===404));
+            core.setOutput('path',path);
+            core.setOutput('tag',manifest.version.includes('-')?'next':'latest');
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: qualified-release
+          path: release-artifacts/*.tgz
+          if-no-files-found: error
+      - name: Publish qualified archive
+        if: "!inputs.dry_run && steps.archive.outputs.publish == 'true'"
+        env:
+          TARBALL: ${{ steps.archive.outputs.path }}
+          DIST_TAG: ${{ steps.archive.outputs.tag }}
+        run: npm publish "$TARBALL" --access public --provenance --ignore-scripts --tag "$DIST_TAG"

@@ -1,0 +1,40 @@
+---
+title: 'Migration files'
+description: 'Author code, declare dependencies, and preserve integrity.'
+---
+
+Migration filenames use `<cuid2>_<name>.ts`. Generate them with `migrate create` to keep filename, metadata ID, and creation time aligned.
+
+## Metadata
+
+`meta` contains `id`, `name`, `namespace`, and `createdAt`. It can also contain `dependsOn`, `supersedes`, `tags`, and `custom`.
+
+Dependencies use migration IDs. Namespaces are ordinary strings. The default namespace is `default`.
+
+## Migration context
+
+| Property              | Purpose                                         |
+| --------------------- | ----------------------------------------------- |
+| `ctx.env`             | Selected environment name and working directory |
+| `ctx.db.kysely`       | Kysely query builder for the current execution  |
+| `ctx.db.schema`       | Schema builder on that query builder            |
+| `ctx.db.dialect.name` | Database dialect                                |
+| `ctx.zenstack.client` | ZenStack client for the current execution       |
+| `ctx.migration`       | Migration identity, file path, and hash         |
+| `ctx.reporter`        | Structured events, warnings, errors, and spans  |
+
+Transactional runs bind migration context and ledger writes to the same transaction. Call the context client inside a migration so database work participates in that boundary.
+
+## Hash integrity
+
+SHA-256 and CRLF-to-LF normalization are the defaults. SHA-512, SHA-1, and MD5 are also configurable.
+
+Hashes cover migration entry-file bytes. Imported helpers, fetched resources, local data files, and external side effects require their own review and integrity controls.
+
+A changed applied file blocks execution until an operator accepts its observed hash with `resolve` or manages accepted alternatives with `reshape`.
+
+## External effects
+
+Database transactions cover database work supported by the dialect. HTTP calls, filesystem writes, and other external effects need idempotency and explicit recovery in your migration code.
+
+A `down` handler is optional. Rollback generation requires it for every active migration selected for reversal.

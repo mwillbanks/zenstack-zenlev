@@ -1,0 +1,25 @@
+---
+title: 'MySQL'
+description: 'Use the configured ZenStack client and account for implicit DDL commits.'
+---
+
+```ts
+import { ZenStackClient } from '@zenstackhq/orm'
+import { MysqlDialect } from '@zenstackhq/orm/dialects/mysql'
+import { createPool } from 'mysql2'
+import { schema } from './zenstack/schema'
+
+export const db = new ZenStackClient(schema, {
+  dialect: new MysqlDialect({
+    pool: createPool(process.env.DATABASE_URL!),
+  }),
+})
+```
+
+Use this client in the Zenlev configuration. The default ledger lives in a `zenlev` database on the same configured server. The migration account needs permissions for that location.
+
+MySQL DDL can commit implicitly. Zenlev reports reduced transaction safety and records execution attempts. A failure can leave partial schema work even when earlier statements succeeded.
+
+Inspect the database after a failed attempt. Use [operator recovery](./rollback-recovery) after reconciling the intended state.
+
+Use `store.location: 'table'` when your account must keep the ledger within the selected database.

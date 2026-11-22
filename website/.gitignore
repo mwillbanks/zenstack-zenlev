@@ -1,0 +1,5 @@
+.source
+.output
+.cache
+node_modules
+src/routeTree.gen.ts

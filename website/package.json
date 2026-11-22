@@ -1,0 +1,41 @@
+{
+  "name": "zenlev-docs",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.4",
+  "scripts": {
+    "build": "bun --bun vite build",
+    "generate": "bun --bun fumadocs-mdx && bun scripts/generate-routes.ts",
+    "typecheck": "bun run generate && bun check",
+    "lint": "bun fmt --check .",
+    "format": "bun fmt .",
+    "verify:build": "bun scripts/verify-build.ts"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.170.46",
+    "@tanstack/react-start": "1.169.5",
+    "@tanstack/start-static-server-functions": "1.167.44",
+    "fumadocs-core": "16.19.0",
+    "fumadocs-mdx": "15.6.0",
+    "fumadocs-ui": "16.19.0",
+    "lucide-react": "1.72.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "seroval": "1.8.1",
+    "zbsearch": "4.0.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.5",
+    "@tanstack/router-generator": "1.168.0",
+    "@types/bun": "1.4.4",
+    "@types/mdx": "2.0.14",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "nitro": "3.0.261103-rc",
+    "tailwindcss": "4.3.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  }
+}

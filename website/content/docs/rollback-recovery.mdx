@@ -1,0 +1,55 @@
+---
+title: 'Rollback and recovery'
+description: 'Generate explicit compensation and reconcile uncertain execution.'
+---
+
+## Choose the rollback mode
+
+```sh
+bunx zenlev migrate rollback --id <id> --cascade --dry-run
+bunx zenlev migrate rollback --id <id> --cascade --format
+bunx zenlev migrate rollback --id <id> --compensate --format
+```
+
+`--cascade` includes active transitive dependents in reverse dependency order. `--compensate` selects the target and warns about its active dependents.
+
+Both modes generate a superseding migration for review. Apply that generated migration through the ordinary migration workflow.
+
+Every included active migration must have a local `down` handler with an accepted hash. A destination where an entry never applied skips its reversal. A cascade stops if new active dependents fall outside the generated reversal set.
+
+## Non-transactional failures
+
+MySQL DDL and explicitly non-transactional runs can leave partial database changes. Zenlev records the attempt before execution and keeps unresolved attempts blocked.
+
+Inspect the database and the failed operation. Reconcile its effects before marking the attempt applied or eligible to retry.
+
+The programmatic recovery shape requires an actor, reason, evidence, migration ID, and observed attempt ID.
+
+```ts
+await zenlev.migrate.recover({
+  action: 'retry',
+  id: migrationId,
+  attemptId: observedAttemptId,
+  actor: 'deployment-operator',
+  reason: 'Reconciled the failed backfill',
+  evidence: 'Reviewed affected rows and restored the documented precondition',
+})
+```
+
+Choose `action: 'applied'` only after verifying that the complete intended change exists.
+
+## Abandoned locks
+
+Confirm the owner is inactive before releasing its lock. Supply the exact observed owner token.
+
+```ts
+await zenlev.migrate.recover({
+  action: 'release-lock',
+  owner: observedOwner,
+  actor: 'deployment-operator',
+  reason: 'The owning deployment process terminated',
+  evidence: 'Verified the process and database session ended',
+})
+```
+
+Lock age alone does not authorize reclamation. Recovery decisions are auditable operator actions.

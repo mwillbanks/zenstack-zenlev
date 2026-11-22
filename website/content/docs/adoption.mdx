@@ -1,0 +1,35 @@
+---
+title: 'Bootstrap and cutover'
+description: 'Start a new database or adopt an existing Prisma-managed database.'
+---
+
+## Existing database
+
+1. Back up the database using your existing operating procedures.
+2. Compare the current ZModel against the live database with `zenlev db push --dry-run --sql`.
+3. Reconcile any drift through reviewed changes.
+4. Stop invoking Prisma's migration runner for future deployments.
+5. Configure a dedicated Zenlev ledger and retain existing Prisma bookkeeping.
+6. Author the first incremental Zenlev migration from the verified current state.
+7. Inspect its plan and apply it through the deployment workflow.
+
+Zenlev starts a new ledger. Historical Prisma SQL files and checksums retain their existing meaning in the project's historical record.
+
+A fresh empty Zenlev ledger on an existing database requires incremental changes. Running an initial create-all migration there would attempt to recreate existing objects.
+
+## Empty database
+
+Keep a reviewed bootstrap path for new environments.
+
+For a fresh project, compare the initial ZModel against the empty database and generate an initial migration.
+
+```sh
+bunx zenlev db push --dry-run --sql
+bunx zenlev db push --create-migration --name initial_schema --format
+bunx zenlev migrate apply --plan-only
+bunx zenlev migrate apply
+```
+
+For a project adopted after Prisma, provision the historical schema through your approved baseline or restore workflow, then run the new Zenlev ledger.
+
+Keep fresh-environment bootstrap and existing-environment cutover explicit in deployment documentation.

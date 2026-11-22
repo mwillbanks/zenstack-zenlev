@@ -1,0 +1,42 @@
+---
+title: 'SQLite'
+description: 'Use Bun SQLite through a Kysely dialect.'
+---
+
+Bun's `bun:sqlite` can back the same Kysely SQLite dialect that ZenStack accepts.
+
+## Complete driver bridge
+
+```ts
+import { Database, type SQLQueryBindings } from 'bun:sqlite'
+import { SqliteDialect } from 'kysely'
+import { ZenStackClient } from '@zenstackhq/orm'
+import { schema } from './zenstack/schema'
+
+const database = new Database('development.sqlite')
+
+const dialect = new SqliteDialect({
+  database: {
+    close: () => database.close(),
+    prepare(sql) {
+      const statement = database.prepare(sql)
+      return {
+        reader: statement.columnNames.length > 0,
+        all: (values) => statement.all(...(values as SQLQueryBindings[])),
+        run: (values) => statement.run(...(values as SQLQueryBindings[])),
+        iterate: (values) => statement.iterate(...(values as SQLQueryBindings[])),
+      }
+    },
+  },
+})
+
+export const db = new ZenStackClient(schema, { dialect })
+```
+
+Generate `zenstack/schema` with your project's `zen generate` workflow. Use the exported client in `zenlev.config.ts`.
+
+## Transaction behavior
+
+SQLite supports transactional schema changes. Zenlev can commit schema work, ORM writes, Kysely writes, and ledger transitions in one transaction.
+
+SQLite keeps Zenlev state in prefixed tables in the database file. Keep that file under the application's normal backup and access controls.

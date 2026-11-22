@@ -1,0 +1,40 @@
+---
+title: 'Schema changes'
+description: 'Compare ZModel to the live database and review each change.'
+---
+
+Zenlev loads ZModel and its imports with ZenStack's language interfaces. It compares physical names, columns, supported defaults, indexes, keys, and relationships with the configured database.
+
+## Inspect first
+
+```sh
+bunx zenlev db push --dry-run --sql
+bunx zenlev db push --create-migration --name add_projects --format
+```
+
+SQL output and dry runs are inspection-only. Migration generation creates a reviewable TypeScript file. Direct `db push` executes the change set.
+
+Zenlev excludes its ledger and Prisma bookkeeping from schema changes. Views are excluded by default.
+
+## Missing tables
+
+A live table absent from ZModel is a drop candidate within the selected schemas. Interactive users can confirm or skip each table.
+
+Automation must choose a policy when candidates exist.
+
+```sh
+bunx zenlev db push --drop-missing-tables=skip
+bunx zenlev db push --create-migration --name remove_legacy --drop-missing-tables=apply
+```
+
+Inspect candidate names and dependent operations before choosing `apply`. Skipping a table also skips its dependent drop operations.
+
+A changed live plan after confirmation stops execution and requires a fresh review.
+
+## Schema-to-schema scaffolding
+
+Use `migrate create --from-schema <previous.zmodel>` to compare a previous ZModel with the current ZModel. Add `--to-db` to compare that source with the live database.
+
+Inverse steps are generated only when their semantics are known. Unsupported rewrites require a manually authored migration.
+
+Zenlev reports destructive changes as warnings. Review generated code for application-level data requirements and external consumers.
