@@ -22,6 +22,18 @@
       "website/content/docs/reference/commands.mdx": "0cb2261114b9178ac76599db80b33f3ba5367e7dc94306aedf3c222e0773f516"
     }
   },
+  "zenlev-plugin-authoring": {
+    "reason": "Reviewed hook order, invocation context, plan constraints, and observer failures against the command service, executor, and plugin APIs.",
+    "files": {
+      "src/engine.ts": "77b03212fa56a6738f33aae499bb5d65c16d20319c00b0a7c0ea00f3c5223b2e",
+      "src/execution.ts": "4db87178cd26c823513a5481c055bf887a097ccd9dd5acfbc55fd887f00c2814",
+      "src/plugins.ts": "d8569fc133dcadcd2719df9bc5301c3fd28c3a4f8f5bd4b6c0ca91a7ab6c3110",
+      "src/types.ts": "9d71d92cca286c8f4d8b1150a785fae80b0cdf91d061d0d398082b837c7e9c33",
+      "website/content/docs/guides/_skills/zenlev-plugin-authoring/SKILL.md": "4ac3b1e9a9db812c650d24643afe464b4c86151749e842b955e4a1267e207d03",
+      "website/content/docs/reference/api.mdx": "bafe5108a57c596a7835f5b9061b6b54885fde170b4e1902bc30c7f68831013f",
+      "website/content/docs/reference/plugins-telemetry.mdx": "e7d56f727f42b3a01c06458730d3e208f5ac06e583e7b3057452a46a81b26229"
+    }
+  },
   "zenlev-recovery": {
     "reason": "Reviewed rollback scope, guarded recovery, and forward-only baseline adoption against the ledger implementation.",
     "files": {

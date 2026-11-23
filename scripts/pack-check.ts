@@ -8,6 +8,7 @@ const root = resolve(import.meta.dir, '..')
 const skillNames = [
   'zenlev-deployment-planning',
   'zenlev-migration-authoring',
+  'zenlev-plugin-authoring',
   'zenlev-recovery',
   'zenlev-schema-diff',
   'zenlev-setup',
@@ -176,7 +177,7 @@ try {
     assert.equal(metadata.name, skill.skillName)
     assert.equal(metadata.metadata.library_version, manifest.version)
   }
-  const identifier = manifest.name + '#zenlev-deployment-planning'
+  const identifier = manifest.name + '#zenlev-plugin-authoring'
   const loaded = JSON.parse(await run(intent('load', identifier, '--json'), consumer)) as {
     package: string
     skill: string
@@ -184,17 +185,12 @@ try {
     content: string
   }
   assert.equal(loaded.package, manifest.name)
-  assert.equal(loaded.skill, 'zenlev-deployment-planning')
+  assert.equal(loaded.skill, 'zenlev-plugin-authoring')
   assert.equal(loaded.version, manifest.version)
   assert.equal(
     loaded.content,
     await Bun.file(
-      resolve(
-        consumer,
-        'node_modules',
-        manifest.name,
-        'skills/zenlev-deployment-planning/SKILL.md',
-      ),
+      resolve(consumer, 'node_modules', manifest.name, 'skills/zenlev-plugin-authoring/SKILL.md'),
     ).text(),
   )
   const consumerManifest = await Bun.file(resolve(consumer, 'package.json')).json()
