@@ -1,0 +1,22 @@
+---
+title: Zenlev 0.1.0
+description: Dependency-based migrations for ZenStack V3 and Kysely.
+---
+
+Zenlev runs TypeScript migrations against your configured ZenStack V3 client or standalone Kysely adapter. SQLite, PostgreSQL, and MySQL are supported.
+
+## Coordinate with application deployments
+
+Assign migrations to namespaces such as `pre-deploy`, `deploy`, and `post-deploy`. Dependencies can cross namespaces. A rollout command can select one namespace, and Zenlev reports pending prerequisites outside that selection. Use `migrate tree` to review dependency order before applying.
+
+## Review rollback and baseline changes
+
+Generate a cascade rollback to reverse active dependents first. Generate a compensation migration to reverse only the selected migration and review the warning about active dependents. Both modes create a superseding migration for review.
+
+Use `migrate squash` to generate a reviewed schema baseline. Apply it to an existing database to adopt the baseline, or use it to bootstrap a fresh database. Review the generated SQL and add required seed data before adopting it.
+
+## Adopt Zenlev
+
+Verify the current schema and stop the previous migration runner before starting a Zenlev ledger. Preserve the Prisma migration history if the project used Prisma. Continue to use `zen db pull` for introspection.
+
+Both `zenstack-zenlev` and `zenlev` expose the same commands. Use `--json` for automation and `--dry-run` to inspect changes before execution.

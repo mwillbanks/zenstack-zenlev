@@ -48,8 +48,7 @@
     "test:coverage": "bun test --coverage --bail --coverage-reporter=text --coverage-reporter=lcov && bun scripts/check-coverage.ts",
     "build": "bun scripts/build.ts",
     "pack:check": "bun scripts/pack-check.ts",
-    "prepack": "bun run build",
-    "release": "release-it"
+    "prepack": "bun run build"
   },
   "dependencies": {
     "@mwillbanks/tuil": "1.0.3",
@@ -72,18 +71,15 @@
     }
   },
   "devDependencies": {
-    "@release-it/conventional-changelog": "12.0.2",
     "@types/bun": "1.4.4",
     "@types/pg": "8.23.1",
     "@zenstackhq/orm": "3.10.3",
     "@zenstackhq/schema": "3.10.3",
-    "conventional-changelog-conventionalcommits": "10.4.0",
     "kysely": "0.29.0",
     "mysql2": "3.24.6",
     "oxc-parser": "0.159.0",
     "oxlint": "1.94.0",
     "pg": "8.23.1",
-    "release-it": "21.1.2",
     "typescript": "7.0.2"
   },
   "engines": {

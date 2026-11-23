@@ -2,6 +2,12 @@
 
 Keep the migration engine independent of ZenStack schema loading and CLI rendering. Put integrations behind typed adapters. Preserve the user's configured Kysely connection and use Bun's native TypeScript runtime and bundler.
 
+## Release notes and changelog
+
+Update `CHANGELOG.md` under `[Unreleased]` for each user-visible change. Describe the behavior and operator impact directly. Squash merges can lose commit detail.
+
+When preparing a release, curate the shipped entries under the version heading. Add versioned notes under `website/content/docs/releases/` and link them in that section's navigation. Release Please manages the version, release pull request, tag, and GitHub release. The trusted GitHub workflow publishes the qualified archive.
+
 ## Commands
 
 - `bun fmt .` formats repository files.

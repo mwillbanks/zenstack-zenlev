@@ -30,11 +30,13 @@ Install documentation dependencies with `bun install --cwd website --frozen-lock
 
 ## Releases
 
-Configure the npm trusted publisher with this repository and the `release.yml` workflow. Give GitHub Actions the repository permissions needed to create tags and GitHub releases. Configure GitHub Pages to use GitHub Actions before dispatching the Pages workflow.
+Record user-visible changes under `[Unreleased]` in `CHANGELOG.md`. Keep entries focused on user impact. Write or update the corresponding release notes under `website/content/docs/releases/` when preparing a version.
 
-Dispatch the release workflow on `main` with the intended version or semver increment. Use its default dry run to qualify the release path. The live run creates the tag and GitHub release, qualifies the exact tagged revision, and publishes the tested tarball to npm with provenance.
+Release Please opens the release pull request from `main` and proposes the version. Before merging it, move the shipped entries to a versioned changelog section, add an empty `[Unreleased]` section, and add the versioned MDX page to the release notes navigation. Use the heading `## [<version>] - YYYY-MM-DD` in the changelog. Review the release pull request and its CI results before merging. Its merge authorizes GitHub Actions to tag the version and publish the qualified archive to npm with provenance.
 
-To recover an interrupted publication, dispatch the workflow with the existing exact tag, such as `v0.1.0`. Run in dry mode first. It checks the tag, version, GitHub release, and tarball integrity. After review, dispatch for the same tag with dry mode disabled.
+Configure the npm trusted publisher for `mwillbanks/zenstack-zenlev` and `release.yml`. Use a repository-scoped `RELEASE_PLEASE_TOKEN` for Release Please when release pull requests must trigger CI automatically. If using the default GitHub token, allow Actions to create pull requests and run or approve the release PR checks as needed. The npm publish job uses GitHub OIDC.
+
+Dispatch Release from `main` with dry run enabled to qualify the package. Supply an existing tag such as `v0.1.0` to qualify that exact GitHub release. To recover npm publication, dispatch the same tag with dry run disabled after reviewing the qualified archive.
 
 ## Pull requests
 
