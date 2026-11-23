@@ -57,10 +57,10 @@
   "dependencies": {
     "@mwillbanks/tuil": "1.0.3",
     "@mwillbanks/tuil-cell": "1.0.3",
-    "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/exporter-trace-otlp-http": "0.219.0",
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.2",
     "@opentelemetry/resources": "2.8.0",
-    "@opentelemetry/sdk-trace-base": "2.8.0",
+    "@opentelemetry/sdk-trace-base": "2.12.0",
     "@paralleldrive/cuid2": "3.3.0",
     "@zenstackhq/language": "3.10.3",
     "react": "19.3.1"
@@ -76,11 +76,11 @@
   },
   "devDependencies": {
     "@tanstack/intent": "0.5.6",
-    "@types/bun": "1.4.4",
+    "@types/bun": "1.4.5",
     "@types/pg": "8.23.1",
     "@zenstackhq/orm": "3.10.3",
     "@zenstackhq/schema": "3.10.3",
-    "kysely": "0.29.0",
+    "kysely": "0.29.9",
     "mysql2": "3.24.6",
     "oxc-parser": "0.159.0",
     "oxlint": "1.94.0",
