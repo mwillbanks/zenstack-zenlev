@@ -27,7 +27,10 @@ export default {
     },
   },
   hooks: {
-    'after:bump': 'bun install --lockfile-only --ignore-scripts',
+    'after:bump': [
+      'bun fmt CHANGELOG.md package.json',
+      'bun install --lockfile-only --ignore-scripts',
+    ],
     'before:git:release': ['bun run verify:coverage', 'bun run build', 'bun run pack:check'],
   },
 }
