@@ -2,7 +2,7 @@
 
 ## Development setup
 
-Use Bun 1.4.4 and install the locked dependencies.
+Use the Bun version pinned in `package.json` and install the locked dependencies.
 
 ```sh
 bun install --frozen-lockfile

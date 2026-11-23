@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "A Bun-native migration system for ZenStack V3 with a reusable Kysely migration engine.",
   "type": "module",
-  "packageManager": "bun@1.4.4",
+  "packageManager": "bun@1.4.5",
   "license": "MIT",
   "author": "Mike Willbanks",
   "repository": {
@@ -57,10 +57,10 @@
   "dependencies": {
     "@mwillbanks/tuil": "1.0.3",
     "@mwillbanks/tuil-cell": "1.0.3",
-    "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/exporter-trace-otlp-http": "0.219.0",
-    "@opentelemetry/resources": "2.8.0",
-    "@opentelemetry/sdk-trace-base": "2.8.0",
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.2",
+    "@opentelemetry/resources": "3.1.1",
+    "@opentelemetry/sdk-trace": "3.1.1",
     "@paralleldrive/cuid2": "3.3.0",
     "@zenstackhq/language": "3.10.3",
     "react": "19.3.1"
@@ -76,20 +76,20 @@
   },
   "devDependencies": {
     "@tanstack/intent": "0.5.6",
-    "@types/bun": "1.4.4",
+    "@types/bun": "1.4.5",
     "@types/pg": "8.23.1",
     "@zenstackhq/orm": "3.10.3",
     "@zenstackhq/schema": "3.10.3",
-    "kysely": "0.29.0",
+    "kysely": "0.29.9",
     "mysql2": "3.24.6",
-    "oxc-parser": "0.159.0",
-    "oxlint": "1.94.0",
+    "oxc-parser": "0.160.0",
+    "oxlint": "1.95.0",
     "pg": "8.23.1",
     "typescript": "7.0.2"
   },
   "engines": {
     "bun": ">=1.4.4",
-    "node": ">=22.0.0"
+    "node": ">=22.15.0"
   },
   "keywords": [
     "bun",

@@ -71,9 +71,9 @@ export async function createTelemetry(
 ) {
   if (!options?.enabled) return { reporter: silentReporter, close: async () => {} }
 
-  const [{ BasicTracerProvider, SimpleSpanProcessor }, { resourceFromAttributes }, api] =
+  const [{ TracerProvider, SimpleSpanProcessor }, { resourceFromAttributes }, api] =
     await Promise.all([
-      import('@opentelemetry/sdk-trace-base'),
+      import('@opentelemetry/sdk-trace'),
       import('@opentelemetry/resources'),
       import('@opentelemetry/api'),
     ])
@@ -83,9 +83,9 @@ export async function createTelemetry(
           options.otlpEndpoint === undefined ? {} : { url: options.otlpEndpoint },
         )
       : consoleExporter(write)
-  const provider = new BasicTracerProvider({
+  const provider = new TracerProvider({
     resource: resourceFromAttributes({ 'service.name': options.serviceName ?? 'zenlev' }),
-    spanProcessors: [new SimpleSpanProcessor(exporter)],
+    spanProcessors: [new SimpleSpanProcessor({ exporter })],
   })
   const tracer = provider.getTracer('zenlev')
   const local = new AsyncLocalStorage<Span>()
