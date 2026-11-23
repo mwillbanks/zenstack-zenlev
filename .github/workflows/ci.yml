@@ -14,13 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  quality:
+    name: Code quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run format:check
+      - run: bun check
+      - run: bun run lint
+
   package:
-    name: Package on ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    name: Package on Linux
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
@@ -33,12 +45,12 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run verify
+      - run: bun run test
       - run: bun run build
       - run: bun run pack:check
 
   dialects:
-    name: PostgreSQL and MySQL integration
+    name: Dialect integration and coverage
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -74,7 +86,13 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run verify:coverage
+      - run: bun run test:coverage
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: lcov
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 7
 
   docs:
     name: Static documentation

@@ -28,6 +28,8 @@ Run `bun run verify:coverage` with `ZENLEV_TEST_POSTGRES_URL` and `ZENLEV_TEST_M
 
 Install documentation dependencies with `bun install --cwd website --frozen-lockfile`. Run `typecheck`, `lint`, `build`, and `verify:build` from `website`.
 
+GitHub requires a pull request and verified commit signatures for changes to `main`. Required checks cover Linux packaging, code quality, dialect integration and coverage, and the static documentation build. The coverage job attaches its LCOV report. CodeQL scans TypeScript and GitHub Actions.
+
 ## Releases
 
 Record user-visible changes under `[Unreleased]` in `CHANGELOG.md`. Keep entries focused on user impact. Write or update the corresponding release notes under `website/content/docs/releases/` when preparing a version.
