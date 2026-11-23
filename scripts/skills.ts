@@ -76,8 +76,13 @@ async function loadSkills(root: string): Promise<Skill[]> {
       assert(metadata.library_version === undefined, file + ' must let staging set the version')
       assert(/^metadata:\n/m.test(manifest), file + ' must use block metadata')
       const files =
-        typeof metadata.zenlev_sources === 'string' ? metadata.zenlev_sources.split('\n') : []
-      assert(files.length > 0, file + ' needs metadata.zenlev_sources')
+        typeof metadata.zenlev_sources === 'string'
+          ? metadata.zenlev_sources.trimEnd().split('\n')
+          : []
+      assert(
+        files.length > 0 && files.every((value) => value.trim()),
+        file + ' needs one non-empty path per line in metadata.zenlev_sources',
+      )
       assert(
         new Set(files).size === files.length && !files.includes(file),
         file + ' lists duplicate sources',

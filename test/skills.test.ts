@@ -25,7 +25,9 @@ test('stages reviewed skills at the package version and detects source drift', a
         'description: Use when checking the fixture.',
         'metadata:',
         '  library: "@mwillbanks/zenstack-zenlev"',
-        '  zenlev_sources: guide.md',
+        '  zenlev_sources: |',
+        '    guide.md',
+        '  type: core',
         '---',
         '# Example',
         '',
@@ -42,16 +44,28 @@ test('stages reviewed skills at the package version and detects source drift', a
       ],
       [valid.replace('description: Use when checking the fixture.\n', ''), 'needs a description'],
       [
-        valid.replace('zenlev_sources: guide.md', 'zenlev_sources: [guide.md]'),
+        valid.replace('zenlev_sources: |\n    guide.md', 'zenlev_sources: [guide.md]'),
         'string-valued metadata',
       ],
+      [valid.replace('guide.md', ''), 'one non-empty path per line'],
+      [valid.replace('guide.md', 'guide.md\n\n    guide.md'), 'one non-empty path per line'],
     ] as const) {
       await Bun.write(markdown, invalid)
       await expect(prepareSkills(root)).rejects.toThrow(message)
     }
     await Bun.write(markdown, valid)
     await expect(prepareSkills(root)).rejects.toThrow('no recorded review')
-    await writeReview('Checked the skill against the guide.')
+    const review = await recordReview(
+      root,
+      'zenlev-example',
+      'Checked the skill against the guide.',
+    )
+    expect(Object.keys(review['zenlev-example']!.files)).toEqual([
+      'guide.md',
+      skillDirectory + '/zenlev-example/SKILL.md',
+      skillDirectory + '/zenlev-example/scripts/example.ts',
+    ])
+    await Bun.write(join(root, reviewPath), JSON.stringify(review))
     await prepareSkills(root)
     const staged = Bun.file(join(root, 'skills/zenlev-example/SKILL.md'))
     expect(await staged.text()).toContain('library_version: "1.2.3"')
