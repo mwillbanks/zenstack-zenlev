@@ -1,0 +1,28 @@
+---
+title: Zenlev 0.2.0
+description: Install versioned Agent Skills, inspect deployment plans offline, and verify ledger state during recovery.
+---
+
+Zenlev 0.2.0 ships guidance for six migration tasks with the npm package. It also adds an offline plan inspector and expands the documentation on schema scaffolding and recovery.
+
+## Use the skills from your installed version
+
+Use TanStack Intent to discover the skills for setup, migration authoring, deployment planning, schema diffs, recovery, and plugin authoring. Allow the exact skill identifiers you trust, then load the guidance for the current task.
+
+The plugin authoring skill covers typed context, lifecycle hooks, vetoes, and how to check the ledger when an observer fails after a commit. The deployment planning skill includes a Bun script that reads a saved `migrate apply --plan-only --json` response and reports selected migrations, blockers, and warnings without connecting to a database.
+
+[Install and use Agent Skills](./guides/agent-skills).
+
+## Check the ledger before scaffolding or recovery
+
+Use a dry run or SQL preview for read-only schema inspection. Generating a migration from a live schema comparison can initialize the ledger and acquire a lock. The generated migration applies the application schema changes when you run it later.
+
+For an interrupted attempt, verify the environment and read the exact attempt ID or lock owner through authorized read-only access to its ledger. Confirm the database effects before recording retry or completion.
+
+[Review schema changes](./guides/schema-changes) and [inspect recovery identities](./guides/rollback-recovery#inspect-recovery-identities).
+
+## Upgrade and check telemetry
+
+The package requires Bun 1.4.4 or newer and declares Node.js 22.15 or newer. The OpenTelemetry integration now uses SDK 3. Zenlev continues to honor environment-selected sampling and span limits.
+
+[Review configuration options](./reference/configuration) and [plugin and telemetry settings](./reference/plugins-telemetry).
