@@ -8,10 +8,12 @@ const root = resolve(import.meta.dir, '..')
 const skillNames = [
   'zenlev-deployment-planning',
   'zenlev-migration-authoring',
+  'zenlev-plugin-authoring',
   'zenlev-recovery',
   'zenlev-schema-diff',
   'zenlev-setup',
 ]
+const planScript = 'skills/zenlev-deployment-planning/scripts/check-plan.ts'
 const intentCli = resolve(root, 'node_modules/@tanstack/intent/dist/cli.mjs')
 type SkillCatalog = {
   skills: { use: string; packageName: string; packageVersion: string; skillName: string }[]
@@ -65,6 +67,7 @@ try {
     'README.md',
     'LICENSE',
     ...skillNames.map((name) => 'skills/' + name + '/SKILL.md'),
+    planScript,
   ]) {
     assert(published.has(required), 'Missing package entry ' + required)
   }
@@ -74,7 +77,7 @@ try {
 
   assert.deepEqual(
     [...published].filter((path) => path.startsWith('skills/')).sort(),
-    skillNames.map((name) => 'skills/' + name + '/SKILL.md'),
+    [...skillNames.map((name) => 'skills/' + name + '/SKILL.md'), planScript].sort(),
   )
   const untrustedName = 'zenlev-untrusted-fixture'
   const untrusted = resolve(temporary, untrustedName)
@@ -176,7 +179,7 @@ try {
     assert.equal(metadata.name, skill.skillName)
     assert.equal(metadata.metadata.library_version, manifest.version)
   }
-  const identifier = manifest.name + '#zenlev-deployment-planning'
+  const identifier = manifest.name + '#zenlev-plugin-authoring'
   const loaded = JSON.parse(await run(intent('load', identifier, '--json'), consumer)) as {
     package: string
     skill: string
@@ -184,17 +187,12 @@ try {
     content: string
   }
   assert.equal(loaded.package, manifest.name)
-  assert.equal(loaded.skill, 'zenlev-deployment-planning')
+  assert.equal(loaded.skill, 'zenlev-plugin-authoring')
   assert.equal(loaded.version, manifest.version)
   assert.equal(
     loaded.content,
     await Bun.file(
-      resolve(
-        consumer,
-        'node_modules',
-        manifest.name,
-        'skills/zenlev-deployment-planning/SKILL.md',
-      ),
+      resolve(consumer, 'node_modules', manifest.name, 'skills/zenlev-plugin-authoring/SKILL.md'),
     ).text(),
   )
   const consumerManifest = await Bun.file(resolve(consumer, 'package.json')).json()
@@ -228,6 +226,62 @@ try {
     )
   }
   await run([process.execPath, 'check', '--no-script'], consumer)
+  const postDeploy = resolve(consumer, 'migrations/a12345678901234567890124_contract.ts')
+  try {
+    await Bun.write(
+      postDeploy,
+      `export const meta = {
+      id: 'a12345678901234567890124', name: 'contract', namespace: 'post-deploy',
+      dependsOn: ['a12345678901234567890123'], createdAt: '2026-11-21T12:00:00Z',
+    }
+    export function up() {}
+    `,
+    )
+    const command = [
+      process.execPath,
+      'run',
+      '--silent',
+      'zenlev',
+      'migrate',
+      'apply',
+      '--plan-only',
+      '--json',
+    ]
+    const planInput = resolve(consumer, 'plan.json')
+    const helper = [
+      process.execPath,
+      resolve(consumer, 'node_modules', manifest.name, planScript),
+      planInput,
+    ]
+    for (const [args, expectedExit] of [
+      [[], 0],
+      [['--namespace', 'post-deploy'], 1],
+    ] as const) {
+      const preview = await Bun.spawn([...command, ...args], { cwd: consumer, stdout: 'pipe' })
+      const json = await new Response(preview.stdout).text()
+      assert.equal(await preview.exited, expectedExit)
+      await Bun.write(planInput, json)
+      const inspection = await Bun.spawn(helper, { cwd: consumer, stdout: 'pipe' })
+      const report = (await new Response(inspection.stdout).json()) as {
+        selected: string[]
+        blockers: { code: string }[]
+      }
+      assert.equal(await inspection.exited, expectedExit)
+      if (expectedExit === 0) {
+        assert.deepEqual(report.selected, ['a12345678901234567890123', 'a12345678901234567890124'])
+        assert.deepEqual(report.blockers, [])
+      } else {
+        assert(report.blockers.some(({ code }) => code === 'PENDING_PREREQUISITE'))
+      }
+    }
+    await Bun.write(planInput, '{"status":"ok","result":[]}')
+    const invalid = Bun.spawn(helper, { cwd: consumer, stdout: 'pipe', stderr: 'pipe' })
+    assert.equal(await invalid.exited, 2)
+    assert.match(await new Response(invalid.stderr).text(), /Expected a Zenlev.*plan-only/)
+  } finally {
+    await rm(postDeploy)
+  }
+
   await run([process.execPath, 'consumer.ts'], consumer)
 
   for (const alias of ['zenlev', 'zenstack-zenlev']) {

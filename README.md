@@ -13,21 +13,47 @@
   <a href="https://app.codecov.io/gh/mwillbanks/zenstack-zenlev"><img src="https://img.shields.io/codecov/c/github/mwillbanks/zenstack-zenlev/main" alt="Measured main line coverage" /></a>
 </p>
 
-Zenlev runs schema and data migrations as a dependency graph. It serves teams whose database changes span deployment stages, application versions, or independent branches.
+## What's Zenlev?
 
-Declare prerequisites explicitly. Select pre-deploy, deploy, and post-deploy work through namespaces while preserving dependencies between stages. Review plans before execution, retain executed hashes for audit, and generate reviewable cascade or compensation migrations when recovery requires reversal.
+Zenlev is a Bun-native database migration toolkit for **ZenStack V3** and **Kysely**. It manages TypeScript schema and data changes for SQLite, PostgreSQL, and MySQL. Use it when a database change needs to span application deployments, when several teams write migrations independently, or when recovery needs to preserve the history of what happened.
 
-Use your existing ZenStack V3 client or a standalone Kysely adapter with SQLite, PostgreSQL, or MySQL. Zenlev uses Bun to run TypeScript migrations. Continue to use `zen db pull` for introspection.
+Read the [full documentation](https://mwillbanks.github.io/zenstack-zenlev/docs) or start with the [installation steps](#installation).
 
-## Quick start
+### How migrations work
 
-Use Bun 1.4.4 or later and Kysely 0.29. ZenStack projects also need a compatible `@zenstackhq/orm` 3.x release.
+Each migration declares its identity, the changes it makes, and any migration IDs it depends on. Zenlev builds a directed acyclic graph from local migration files and the destination's ledger. The graph allows independent work to move on separate schedules and ensures each migration runs after its prerequisites.
+
+For example, replacing a column across a rolling deployment can require three separate changes.
+
+| Stage         | Database change                              | When to run it                                 |
+| ------------- | -------------------------------------------- | ---------------------------------------------- |
+| `pre-deploy`  | Add a nullable replacement column            | Before deploying code that writes both columns |
+| `deploy`      | Backfill the replacement from the old column | After dual writes are live                     |
+| `post-deploy` | Remove the old column                        | After all readers and writers have switched    |
+
+Declare that backfill depends on expansion and removal depends on backfill. A namespace selects a stage. A pending prerequisite outside that stage blocks the plan. An environment selects the database connection and its ledger, so staging and production can move through the same graph independently. [Deployment guide](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/deployments) · [Namespaces and environments](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/namespaces)
+
+### What you can do
+
+- **Plan before applying.** Preview the selected migrations and their blockers. Filter by IDs, graph bounds, namespaces, or tags. Export a dependency tree for review. [Dependency graph](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/graph)
+- **Write and audit TypeScript migrations.** Use the configured ZenStack client or Kysely in migration handlers. The ledger records the executed entry-file hash and exposes unexpected edits. [Migration authoring](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/migrations)
+- **Review ZModel changes as SQL.** Compare against a live database or a previous schema. Preview SQL or generate a migration and decide explicitly which absent-model tables to drop. Keep using `zen db pull` for introspection. [Schema changes](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/schema-changes)
+- **Evolve history deliberately.** Supersede a migration, generate a reviewable rollback, reconcile an interrupted attempt, or squash completed history into a baseline for fresh databases. [Rollback and recovery](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/rollback-recovery) · [Baselines](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/baseline)
+- **Extend execution.** Register typed plugins for deployment checks and migration context. Opt into OpenTelemetry export when you need execution traces. [Plugins and telemetry](https://mwillbanks.github.io/zenstack-zenlev/docs/reference/plugins-telemetry)
+
+## Installation
+
+### 1. Install Zenlev
+
+Use Bun 1.4.4 or later. Zenlev accepts Kysely 0.29 and supports ZenStack ORM 3.10 or later within major version 3.
 
 ```sh
 bun add -d @mwillbanks/zenstack-zenlev
 ```
 
-Create `zenlev.config.ts` beside your project manifest. Import your configured client.
+### 2. Configure the database connection
+
+Create `zenlev.config.ts` next to your project manifest. Import your application's configured ZenStack client.
 
 ```ts
 import { defineConfig } from '@mwillbanks/zenstack-zenlev'
@@ -36,43 +62,70 @@ import { db } from './db'
 export default defineConfig({ client: db })
 ```
 
-Generate a migration. Add changes to its `up` handler and provide `down` when reversal is safe.
+Use a client factory to route named environments or a Kysely adapter for standalone projects. [Configuration](https://mwillbanks.github.io/zenstack-zenlev/docs/reference/configuration) · [SQLite, PostgreSQL, and MySQL examples](https://mwillbanks.github.io/zenstack-zenlev/docs/dialects)
+
+### 3. Create, preview, and apply a migration
 
 ```sh
 bun run zenlev migrate create --name add_accounts --empty
-bun run zenlev migrate apply --plan-only
-bun run zenlev migrate apply
 ```
 
-Both `zenlev` and `zenstack-zenlev` run the same CLI. Add `--json` for automation.
+Keep the generated metadata in `migrations/`. Replace the empty `up` handler with the schema or data change you intend to make. This example creates an accounts table in a fresh development database.
 
-Follow the [setup guide](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/quick-start) and [dialect examples](https://mwillbanks.github.io/zenstack-zenlev/docs/dialects) for complete connection configuration.
+```ts
+export async function up(ctx: MigrationCtx) {
+  await ctx.db.schema
+    .createTable('accounts')
+    .addColumn('id', 'integer', (column) => column.primaryKey())
+    .addColumn('name', 'varchar(255)', (column) => column.notNull())
+    .execute()
+}
+```
 
-## Agent skills
+Add a `down` handler if you can reverse the change safely. Preview the plan against your development database, then apply.
 
-The npm package ships five task-focused Agent Skills for setup, migration authoring, deployment planning, schema diffing, and recovery. TanStack Intent discovers guidance from the installed package version.
+```sh
+bun run zenlev migrate apply --plan-only
+bun run zenlev migrate apply
+bun run zenlev migrate status
+```
 
-Use an explicit skill allowlist and exclusions. Load the guidance needed for each task. The [Agent skills guide](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/agent-skills) includes pinned npm and Bun commands, configuration, and the static discovery trust model.
+The CLI also runs as `zenstack-zenlev`. Add `--json` for automation. [First migration walkthrough](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/quick-start) · [CLI reference](https://mwillbanks.github.io/zenstack-zenlev/docs/reference/commands)
 
-## Plan changes across deployments
+### 4. Install agent guidance
 
-Namespaces organize deployment stages. Dependencies remain global, so selecting a deploy namespace reports any pending pre-deploy prerequisite as a blocker. Tags and explicit IDs refine the selected scope.
+Install TanStack Intent as a development dependency.
 
-Superseding migrations replace graph history explicitly. Rollback generates a new migration for review. Baselines preserve the schema needed by future environments without replaying every historical migration.
+```sh
+bun add --dev --exact @tanstack/intent@0.5.6
+```
 
-Read [deployment planning](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/deployments) and [recovery](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/rollback-recovery) before operating a staged rollout.
+Add an allowlist to your project's `package.json`. Then list the allowed skills and load the one you need.
 
-## Schema changes and Prisma adoption
+```json
+{
+  "intent": {
+    "skills": ["@mwillbanks/zenstack-zenlev#zenlev-setup"]
+  }
+}
+```
 
-Preview current ZModel changes with `bun run zenlev db push --sql`. Review SQL and manual migration diagnostics before execution. Decide explicitly whether missing live tables should be dropped.
+```sh
+bun run intent list
+bun run intent load '@mwillbanks/zenstack-zenlev#zenlev-setup'
+```
 
-For existing Prisma projects, verify the current schema, retire the old migration job, and preserve its ledger. Start a separate Zenlev history for future changes. Follow the [adoption guide](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/adoption) for adoption and clean database bootstrap.
+Use a Zenlev release that includes `skills/`. Intent loads guidance from the installed version. The six skills cover setup, migration authoring, deployment planning, schema diffing, plugin authoring, and recovery. [Agent Skills installation and allowlist examples](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/agent-skills)
+
+## Moving from Prisma Migrate
+
+Verify that the existing database matches your expected schema and stop the old migration runner. Preserve the Prisma ledger and start a separate Zenlev ledger for new changes. Establish a reviewed baseline when fresh databases need to bootstrap the existing schema. [Adoption guide](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/adoption)
 
 ## Documentation and contributing
 
 - [Documentation](https://mwillbanks.github.io/zenstack-zenlev/docs)
 - [CLI reference](https://mwillbanks.github.io/zenstack-zenlev/docs/reference/commands)
-- [API reference](https://mwillbanks.github.io/zenstack-zenlev/docs/reference/api)
+- [TypeScript API reference](https://mwillbanks.github.io/zenstack-zenlev/docs/reference/api)
 - [Changelog](https://github.com/mwillbanks/zenstack-zenlev/blob/main/CHANGELOG.md)
 - [Contributing](https://github.com/mwillbanks/zenstack-zenlev/blob/main/CONTRIBUTING.md)
 - [Security](https://github.com/mwillbanks/zenstack-zenlev/blob/main/SECURITY.md)

@@ -25,7 +25,7 @@ jobs:
       markdown: ${{ steps.scope.outputs.markdown }}
       skills: ${{ steps.scope.outputs.skills }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -41,13 +41,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version: '26'
-      - uses: oven-sh/setup-bun@v2.2.0
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile --ignore-scripts
@@ -61,10 +61,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2.2.0
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
       - if: needs.scope.outputs.templates == 'true'
@@ -81,10 +81,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2.2.0
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile --ignore-scripts
@@ -99,13 +99,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version: '26'
-      - uses: oven-sh/setup-bun@v2.2.0
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile --ignore-scripts
@@ -120,7 +120,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:17
+        image: postgres:19
         env:
           POSTGRES_USER: zenlev
           POSTGRES_PASSWORD: zenlev
@@ -131,7 +131,7 @@ jobs:
           --health-cmd "pg_isready -U zenlev -d zenlev_test"
           --health-interval 5s --health-timeout 3s --health-retries 20
       mysql:
-        image: mysql:8.4
+        image: mysql:26
         env:
           MYSQL_ROOT_PASSWORD: zenlev
           MYSQL_DATABASE: zenlev_test
@@ -144,15 +144,15 @@ jobs:
       ZENLEV_TEST_POSTGRES_URL: postgresql://zenlev:zenlev@127.0.0.1:5432/zenlev_test
       ZENLEV_TEST_MYSQL_URL: mysql://root:zenlev@127.0.0.1:3306/zenlev_test
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2.2.0
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run test:coverage
-      - uses: actions/upload-artifact@v7.0.2
+      - uses: actions/upload-artifact@v7
         with:
           name: lcov
           path: coverage/lcov.info
@@ -171,14 +171,14 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+      - uses: actions/download-artifact@v8
         with:
           name: lcov
           path: coverage
-      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+      - uses: codecov/codecov-action@v7
         with:
           use_oidc: true
           files: coverage/lcov.info
@@ -195,10 +195,10 @@ jobs:
       run:
         working-directory: website
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2.2.0
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: website/package.json
       - run: bun install --frozen-lockfile --ignore-scripts

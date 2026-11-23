@@ -1,0 +1,165 @@
+{
+  "routing": [
+    {
+      "query": "CI requests staging but the Bun workspace always hits dev. Where do we route connections?",
+      "expected": "zenlev-setup"
+    },
+    {
+      "query": "Compare our mapped ZModel to production SQLite and print SQL to review first.",
+      "expected": "zenlev-schema-diff"
+    },
+    {
+      "query": "Can we use a release check callback to veto destructive Zenlev migrations?",
+      "expected": "zenlev-plugin-authoring"
+    },
+    {
+      "query": "Contract shows PENDING_PREREQUISITE despite the pre-deploy branch having a newer replacement.",
+      "expected": "zenlev-deployment-planning"
+    },
+    {
+      "query": "MySQL run stopped after creating the table, before copying the data. What can we mark in the ledger?",
+      "expected": "zenlev-recovery"
+    },
+    {
+      "query": "I need a second TypeScript job to backfill a nullable field after the original migration ran.",
+      "expected": "zenlev-migration-authoring"
+    },
+    {
+      "query": "Where do I put a GitHub Action for opening Release Please PRs?",
+      "expected": null
+    },
+    {
+      "query": "Please wire the team's Kysely connection into this package without adding a ZenStack client.",
+      "expected": "zenlev-setup"
+    },
+    {
+      "query": "Can we skip the extra live queue table when generating an alignment migration?",
+      "expected": "zenlev-schema-diff"
+    },
+    {
+      "query": "Put a tenant label into typed Zenlev hooks using the current environment.",
+      "expected": "zenlev-plugin-authoring"
+    },
+    {
+      "query": "If I pass both a namespace and a DAG endpoint, why are so few jobs selected?",
+      "expected": "zenlev-deployment-planning"
+    },
+    {
+      "query": "One dependent is still active; can the rollback leave it alone?",
+      "expected": "zenlev-recovery"
+    },
+    {
+      "query": "Can we change an already-applied migration file to use a common helper?",
+      "expected": "zenlev-migration-authoring"
+    },
+    {
+      "query": "The Playwright post-deploy smoke test flakes. Diagnose the browser fixture.",
+      "expected": null
+    },
+    {
+      "query": "Who closes the database from a ZenStack factory called by this CLI?",
+      "expected": "zenlev-setup"
+    },
+    {
+      "query": "I have yesterday's schema and today's; scaffold the ZModel diff.",
+      "expected": "zenlev-schema-diff"
+    },
+    {
+      "query": "An audit hook failed after the ledger was committed. I'm implementing its error handling.",
+      "expected": "zenlev-plugin-authoring"
+    },
+    {
+      "query": "How do I split an app rollout into expansion, code deploy, and cleanup with cross-stage dependencies?",
+      "expected": "zenlev-deployment-planning"
+    },
+    {
+      "query": "We want one baseline to bootstrap future destinations but keep existing audit history.",
+      "expected": "zenlev-recovery"
+    },
+    {
+      "query": "Can a Zenlev down handler safely drop a newly populated column? I'm reviewing its code.",
+      "expected": "zenlev-migration-authoring"
+    },
+    {
+      "query": "Please install a VS Code database extension for querying staging.",
+      "expected": null
+    },
+    {
+      "query": "Generate a clean-room Kysely adapter configuration for MySQL.",
+      "expected": "zenlev-setup"
+    },
+    {
+      "query": "We need a hand-written TypeScript migration that preserves existing values and declares an external side effect.",
+      "expected": "zenlev-migration-authoring"
+    },
+    {
+      "query": "The status command says our failed attempt is blocked. What evidence do we need before retrying?",
+      "expected": "zenlev-recovery"
+    }
+  ],
+  "behavior": [
+    {
+      "skill": "zenlev-setup",
+      "prompt": "In a Bun monorepo, an imported singleton ZenStack client always points at development. CI passes --env staging from the app workspace but still plans against development. Keep ownership clear and propose a safe check.",
+      "expectations": [
+        "Replace the borrowed singleton with one owned factory that selects the connection by name and has an explicit disposer.",
+        "Reject unknown environments and run status and plan-only in the correct app workspace and environment.",
+        "Verify the redacted destination identity independently of plan status and stop if it cannot be verified."
+      ]
+    },
+    {
+      "skill": "zenlev-migration-authoring",
+      "prompt": "Add a nullable column then backfill in a different namespace. The expansion already ran elsewhere and the team wants to edit it to add the backfill. MySQL runs in production. Explain how you would author and test this.",
+      "expectations": [
+        "Preserve applied bytes. Scaffold a distinct backfill and depend on the original expansion ID.",
+        "There are implicit MySQL DDL commits. Address repeatability and reconciliation with transaction-scoped context.",
+        "Verify a disposable fresh database and one with expansion applied. Only promise down when it preserves later data."
+      ]
+    },
+    {
+      "skill": "zenlev-deployment-planning",
+      "prompt": "JSON plan for post-deploy has no CLI error and PENDING_PREREQUISITE for a pre-deploy job. A newer migration supersedes that prerequisite. Explain how to decide whether to run contract and what commands inspect this.",
+      "expectations": [
+        "Inspect the effective supersedes graph and resolved prerequisite status on the same destination.",
+        "Inspect plan-only blockers despite reported success and stop until the prerequisite is satisfied.",
+        "Review all stages and re-preview after prerequisite and app deployment before authorized contract."
+      ]
+    },
+    {
+      "skill": "zenlev-schema-diff",
+      "prompt": "Need a reviewable migration from current ZModel against a live SQLite destination with an extra live table named import_queue that must be retained. Show the commands, effect of each and whether to generate immediately.",
+      "expectations": [
+        "Preview with db push --dry-run --sql and explicit --drop-missing-tables=skip on the verified destination.",
+        "Verify ordered SQL keeps import_queue and its dependencies. Scaffold only after reviewing that set.",
+        "State that --create-migration writes a file and can initialize or update the live ledger, without applying application schema SQL. Test the file in disposable SQLite."
+      ]
+    },
+    {
+      "skill": "zenlev-recovery",
+      "prompt": "A failed non-transactional migration has an unresolved attempt and lock. The table exists but the data copy is incomplete. Operator wants retry or mark applied. Explain evidence and sequence. Also say what changes if an active dependent needs rollback.",
+      "expectations": [
+        "Verify the affected environment, observed owner and attempt ID. Confirm previous runner and its database session are terminated before releasing a lock.",
+        "Require actor, reason and evidence for recovery. Reject applied until all effects are present and retry until rerunning is safe.",
+        "Preview cascade if a dependent must reverse. Verify usable down handlers and state that a later apply executes the generated rollback."
+      ]
+    },
+    {
+      "skill": "zenlev-plugin-authoring",
+      "prompt": "Add a release veto and derived label to a Zenlev plugin. An audit callback can throw after commit. Explain hooks, typing, previews and what to check before retry.",
+      "expectations": [
+        "Register a uniquely named definePlugin and use decorate and derive plus typed migration context.",
+        "Select a before hook at the correct boundary. Keep previews free of external effects.",
+        "Use the original environment's ledger to distinguish committed work from observer failure before considering retry."
+      ]
+    },
+    {
+      "skill": "zenlev-recovery",
+      "prompt": "An interrupted MySQL migration ran on billing-staging. The owner process is gone and it left an unresolved attempt. The new table exists but most rows were never copied. The default config points elsewhere. Explain what to inspect, whether retry or applied is justified, and give the exact command templates including the affected database. If a downstream active migration needs reversing too, explain the preview command and whether it edits database state.",
+      "expectations": [
+        "Include --env billing-staging in recovery and rollback templates.",
+        "Get the owner and attempt ID through authorized read-only ledger access. Account for the previous database session. Require complete effects for applied and verified repeatability for retry.",
+        "Preview cascade without writes. Distinguish generation from database reversal."
+      ]
+    }
+  ]
+}

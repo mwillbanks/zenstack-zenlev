@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import type { SpanLimits } from '@opentelemetry/sdk-trace'
 import type { Span, SpanExporter, ReadableSpan } from './telemetry-types'
 import type { Attributes, Reporter, ReporterSpan, ZenlevSettings } from './types'
 
@@ -63,29 +64,85 @@ function consoleExporter(write: (line: string) => void): SpanExporter {
   }
 }
 
+type TraceSdk = typeof import('@opentelemetry/sdk-trace')
+
+function numberFromEnv(value: string | undefined): number | undefined {
+  if (!value?.trim()) return undefined
+  const number = Number(value)
+  return Number.isNaN(number) ? undefined : number
+}
+
+function samplerFromEnv(sdk: TraceSdk, env: NodeJS.ProcessEnv) {
+  const { AlwaysOnSampler, AlwaysOffSampler, ParentBasedSampler, TraceIdRatioBasedSampler } = sdk
+  const sampler = env.OTEL_TRACES_SAMPLER
+  switch (sampler) {
+    case 'always_on':
+      return new AlwaysOnSampler()
+    case 'always_off':
+      return new AlwaysOffSampler()
+    case 'parentbased_always_off':
+      return new ParentBasedSampler({ root: new AlwaysOffSampler() })
+    case 'traceidratio':
+    case 'parentbased_traceidratio': {
+      const probability = numberFromEnv(env.OTEL_TRACES_SAMPLER_ARG) ?? 1
+      const root = new TraceIdRatioBasedSampler(
+        probability >= 0 && probability <= 1 ? probability : 1,
+      )
+      return sampler === 'traceidratio' ? root : new ParentBasedSampler({ root })
+    }
+    default:
+      // The SDK defaults to parent-based always-on, as SDK 2 did for unset or unsupported values.
+      return undefined
+  }
+}
+
+function spanLimitsFromEnv(env: NodeJS.ProcessEnv): SpanLimits {
+  const variables = {
+    attributeCountLimit:
+      numberFromEnv(env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT) ??
+      numberFromEnv(env.OTEL_ATTRIBUTE_COUNT_LIMIT),
+    attributeValueLengthLimit:
+      numberFromEnv(env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT) ??
+      numberFromEnv(env.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT),
+    eventCountLimit: numberFromEnv(env.OTEL_SPAN_EVENT_COUNT_LIMIT),
+    linkCountLimit: numberFromEnv(env.OTEL_SPAN_LINK_COUNT_LIMIT),
+    attributePerEventCountLimit: numberFromEnv(env.OTEL_SPAN_ATTRIBUTE_PER_EVENT_COUNT_LIMIT),
+    attributePerLinkCountLimit: numberFromEnv(env.OTEL_SPAN_ATTRIBUTE_PER_LINK_COUNT_LIMIT),
+  }
+  const limits: SpanLimits = {}
+  for (const key of Object.keys(variables) as (keyof SpanLimits)[]) {
+    const value = variables[key]
+    if (value !== undefined) limits[key] = value
+  }
+  return limits
+}
+
 export async function createTelemetry(
   options: TelemetryOptions,
   write: (line: string) => void = (line) => {
     process.stderr.write(line)
   },
+  env: NodeJS.ProcessEnv = process.env,
 ) {
   if (!options?.enabled) return { reporter: silentReporter, close: async () => {} }
 
-  const [{ BasicTracerProvider, SimpleSpanProcessor }, { resourceFromAttributes }, api] =
-    await Promise.all([
-      import('@opentelemetry/sdk-trace-base'),
-      import('@opentelemetry/resources'),
-      import('@opentelemetry/api'),
-    ])
+  const [sdk, { resourceFromAttributes }, api] = await Promise.all([
+    import('@opentelemetry/sdk-trace'),
+    import('@opentelemetry/resources'),
+    import('@opentelemetry/api'),
+  ])
   const exporter =
     options.exporter === 'otlp'
       ? new (await import('@opentelemetry/exporter-trace-otlp-http')).OTLPTraceExporter(
           options.otlpEndpoint === undefined ? {} : { url: options.otlpEndpoint },
         )
       : consoleExporter(write)
-  const provider = new BasicTracerProvider({
+  const sampler = samplerFromEnv(sdk, env)
+  const provider = new sdk.TracerProvider({
     resource: resourceFromAttributes({ 'service.name': options.serviceName ?? 'zenlev' }),
-    spanProcessors: [new SimpleSpanProcessor(exporter)],
+    spanProcessors: [new sdk.SimpleSpanProcessor({ exporter })],
+    ...(sampler === undefined ? {} : { sampler }),
+    spanLimits: spanLimitsFromEnv(env),
   })
   const tracer = provider.getTracer('zenlev')
   const local = new AsyncLocalStorage<Span>()

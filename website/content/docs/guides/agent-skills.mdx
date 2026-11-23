@@ -3,7 +3,7 @@ title: Agent skills
 description: Load task-focused Zenlev guidance from your installed package with TanStack Intent, explicit permissions, and version review.
 ---
 
-Zenlev ships five Agent Skills with its npm package. Each skill explains a specific migration task and its decision points. TanStack Intent discovers that guidance from your installed dependency, so the instructions travel with the library version you use.
+Zenlev ships six Agent Skills with its npm package. Each skill explains a specific migration task and its decision points. TanStack Intent discovers that guidance from your installed dependency, so the instructions travel with the library version you use.
 
 Skills help an agent reason about the graph and database state. They do not grant permission to run migrations or replace your deployment controls.
 
@@ -39,6 +39,7 @@ Merge this policy into your project's `package.json` before discovery. Exact ide
       "@mwillbanks/zenstack-zenlev#zenlev-migration-authoring",
       "@mwillbanks/zenstack-zenlev#zenlev-deployment-planning",
       "@mwillbanks/zenstack-zenlev#zenlev-schema-diff",
+      "@mwillbanks/zenstack-zenlev#zenlev-plugin-authoring",
       "@mwillbanks/zenstack-zenlev#zenlev-recovery"
     ]
   }
@@ -51,6 +52,7 @@ Merge this policy into your project's `package.json` before discovery. Exact ide
 | `zenlev-migration-authoring` | Metadata, dependencies, hashes, transaction scope, and reversible changes.     |
 | `zenlev-deployment-planning` | Namespace stages, cross-stage blockers, filters, and supersedes.               |
 | `zenlev-schema-diff`         | Comparison direction, SQL review, and missing-table decisions.                 |
+| `zenlev-plugin-authoring`    | Typed context, lifecycle hooks, execution policy, and audit observers.         |
 | `zenlev-recovery`            | Cascade, compensation, abandoned locks, interrupted attempts, and baselines.   |
 
 An exclusion overrides an allowlist entry. For example, this project permits deployment planning but withholds recovery guidance:
@@ -88,6 +90,8 @@ npx --no-install intent load '@mwillbanks/zenstack-zenlev#zenlev-deployment-plan
 ```
 
 For example, ask your agent to inspect a pre-deploy → deploy → post-deploy graph. Load deployment planning first. The agent should preview each namespace and report an excluded pending prerequisite as a blocker. Load migration authoring only if the task also requires new migration code.
+
+Deployment planning includes an optional Bun script, `scripts/check-plan.ts`, beside the loaded skill. Review the script before running it on saved `--plan-only --json` output. It reads the supplied JSON and summarizes selection, blockers, and warnings without opening a database connection.
 
 A successful load returns guidance. It does not prove that the agent selected the right skill or followed it. Verify the proposed commands, plan, and database evidence.
 
@@ -133,4 +137,5 @@ Read [Intent's trust model](https://tanstack.com/intent/latest/docs/concepts/tru
 - [Plan deployment stages](./guides/deployments).
 - [Understand namespace selection](./guides/namespaces).
 - [Review schema changes](./guides/schema-changes).
+- [Author a lifecycle plugin](./reference/plugins-telemetry).
 - [Recover a rollout](./guides/rollback-recovery).

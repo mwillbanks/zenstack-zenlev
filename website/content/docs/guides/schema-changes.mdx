@@ -14,7 +14,7 @@ bun run zenlev db push --dry-run --sql
 bun run zenlev db push --create-migration --name add_projects --format
 ```
 
-SQL output and dry runs inspect changes without executing the change set or creating a migration. Migration generation creates a reviewable TypeScript file. Direct `db push` executes the change set.
+SQL output and dry runs inspect changes without executing the change set or creating a migration. Migration generation creates a reviewable TypeScript file and takes a live ledger lock. It can initialize the ledger. Use SQL output or dry-run when you have read-only access. Direct `db push` executes the change set.
 
 Use generation when a schema change belongs to a deployment stage or needs a prerequisite such as a completed backfill. Review the generated metadata, namespace, dependencies, and handlers before applying it.
 

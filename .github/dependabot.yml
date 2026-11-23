@@ -15,8 +15,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    groups:
-      actions:
+    ignore:
+      - dependency-name: '*'
         update-types:
-          - minor
-          - patch
+          - version-update:semver-minor
+          - version-update:semver-patch

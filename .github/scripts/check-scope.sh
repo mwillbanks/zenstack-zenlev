@@ -39,6 +39,9 @@ git diff --no-renames --name-only -z "$base" "$head" -- | {
       skills=true
     fi
     case "$file" in
+      website/content/docs/guides/_skills/*/scripts/*)
+        skills=true
+        package=true ;;
       website/content/docs/guides/_skills/*|skills-review.json)
         skills=true ;;
       scripts/skills.ts|test/skills.test.ts|package.json|bun.lock|.gitignore)
