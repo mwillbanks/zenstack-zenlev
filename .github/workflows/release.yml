@@ -165,7 +165,7 @@ jobs:
           path: release-artifacts
       - name: Publish qualified archive
         env:
-          TARBALL: release-artifacts/${{ needs.qualify.outputs.path }}
+          TARBALL: ./release-artifacts/${{ needs.qualify.outputs.path }}
           INTEGRITY: ${{ needs.qualify.outputs.integrity }}
           DIST_TAG: ${{ needs.qualify.outputs.tag }}
         run: |
