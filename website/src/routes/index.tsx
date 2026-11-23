@@ -4,7 +4,18 @@ import { HomeLayout } from 'fumadocs-ui/layouts/home'
 import { baseOptions } from '@/lib/layout.shared'
 import { DeploymentGraph } from '@/components/deployment-graph'
 
-export const Route = createFileRoute('/')({ component: Home })
+import { pageHead, siteDescription } from '@/lib/site'
+
+export const Route = createFileRoute('/')({
+  component: Home,
+  head: () =>
+    pageHead(
+      'Zenlev — TypeScript migrations for ZenStack V3',
+      siteDescription,
+      '/',
+      import.meta.env.BASE_URL,
+    ),
+})
 
 function Home() {
   return (

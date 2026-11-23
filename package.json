@@ -32,6 +32,7 @@
   },
   "files": [
     "dist",
+    "skills",
     "README.md",
     "AGENTS.md",
     "CHANGELOG.md",
@@ -46,7 +47,10 @@
     "lint": "oxlint src test scripts && bun scripts/check-unit-timing.ts",
     "test": "bun test --bail",
     "test:coverage": "bun test --coverage --bail --coverage-reporter=text --coverage-reporter=lcov && bun scripts/check-coverage.ts",
-    "build": "bun scripts/build.ts",
+    "skills:prepare": "bun scripts/skills.ts",
+    "skills:check": "bun run skills:prepare && intent validate --check",
+    "skills:review": "bun scripts/skills.ts review",
+    "build": "bun run skills:prepare && bun scripts/build.ts",
     "pack:check": "bun scripts/pack-check.ts",
     "prepack": "bun run build"
   },
@@ -71,6 +75,7 @@
     }
   },
   "devDependencies": {
+    "@tanstack/intent": "0.5.6",
     "@types/bun": "1.4.4",
     "@types/pg": "8.23.1",
     "@zenstackhq/orm": "3.10.3",
@@ -91,6 +96,7 @@
     "database",
     "kysely",
     "migrations",
+    "tanstack-intent",
     "zenstack",
     "zenstack-v3"
   ]

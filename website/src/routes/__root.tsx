@@ -13,12 +13,6 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Zenlev — migrations with a direction' },
-      {
-        name: 'description',
-        content:
-          'TypeScript migrations, explicit dependency graphs, and your configured ZenStack client. Built for Bun.',
-      },
       { name: 'theme-color', content: '#121212' },
     ],
   }),

@@ -12,6 +12,7 @@ import { getMDXComponents } from '@/components/mdx'
 import { baseOptions } from '@/lib/layout.shared'
 import { source } from '@/lib/source'
 import { legacyDocPaths } from '@/lib/doc-paths'
+import { pageHead } from '@/lib/site'
 
 export const Route = createFileRoute('/docs/$')({
   component: Page,
@@ -21,9 +22,15 @@ export const Route = createFileRoute('/docs/$')({
     await clientLoader.preload(data.path)
     return data
   },
-  head: ({ loaderData }) => ({
-    links: loaderData?.canonical ? [{ rel: 'canonical', href: loaderData.canonical }] : [],
-  }),
+  head: ({ loaderData }) =>
+    loaderData
+      ? pageHead(
+          loaderData.title + ' | Zenlev',
+          loaderData.description,
+          loaderData.route,
+          import.meta.env.BASE_URL,
+        )
+      : {},
 })
 
 const loadPage = createServerFn({ method: 'GET' })
@@ -38,7 +45,10 @@ const loadPage = createServerFn({ method: 'GET' })
     return {
       pageTree: await source.serializePageTree(source.getPageTree()),
       path: page.path,
-      canonical: alias ? import.meta.env.BASE_URL + 'docs/' + alias + '/' : undefined,
+      title: page.data.title,
+      description:
+        page.data.description ?? 'Zenlev documentation for TypeScript database migrations.',
+      route: '/docs' + ((alias ?? slug) ? '/' + (alias ?? slug) : ''),
     }
   })
 

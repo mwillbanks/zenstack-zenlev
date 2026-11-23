@@ -23,6 +23,7 @@ jobs:
       website: ${{ steps.scope.outputs.website }}
       templates: ${{ steps.scope.outputs.templates }}
       markdown: ${{ steps.scope.outputs.markdown }}
+      skills: ${{ steps.scope.outputs.skills }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -32,6 +33,26 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: bash .github/scripts/check-scope.sh "$BASE_SHA" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+  skills:
+    name: Agent skills
+    needs: scope
+    if: needs.scope.outputs.skills == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '26'
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run skills:check
+      - run: bun test test/skills.test.ts
 
   repository-lint:
     name: Repository files lint
@@ -137,6 +158,30 @@ jobs:
           path: coverage/lcov.info
           if-no-files-found: error
           retention-days: 7
+
+  coverage-upload:
+    name: Publish main coverage
+    needs: dialects
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: lcov
+          path: coverage
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: coverage/lcov.info
+          disable_search: true
+          fail_ci_if_error: true
 
   docs:
     name: Static documentation

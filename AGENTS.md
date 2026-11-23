@@ -8,6 +8,10 @@ Update `CHANGELOG.md` under `[Unreleased]` for each user-visible change. Describ
 
 When preparing a release, curate the shipped entries under the version heading. Add versioned notes under `website/content/docs/releases/` and link them in that section's navigation. Release Please manages the version, release pull request, tag, and GitHub release. The trusted GitHub workflow publishes the qualified archive.
 
+## Agent Skills
+
+Edit the canonical skills under `website/content/docs/guides/_skills/`. Each skill lists the repository files that support its guidance. After reviewing a change to a skill or a declared source, run `bun run skills:review <skill> "<reason>"` and apply the resulting JSON to `skills-review.json`. Explain why the guidance changed or why it remains accurate. Run `bun run skills:check`. Build and CI verify the recorded review and generate the package skills from canonical sources.
+
 ## Commands
 
 - `bun fmt .` formats repository files.

@@ -1,0 +1,61 @@
+{
+  "zenlev-deployment-planning": {
+    "reason": "Reviewed namespace selection, effective graph rewriting, and prerequisite blockers against the planner and executor.",
+    "files": {
+      "src/execution.ts": "4db87178cd26c823513a5481c055bf887a097ccd9dd5acfbc55fd887f00c2814",
+      "src/graph.ts": "2cacd37ba4688419095b823cc3417aa89ff67341921b28e9752c202861a98748",
+      "website/content/docs/guides/_skills/zenlev-deployment-planning/SKILL.md": "bbbe359ee1aabf0e97b7f71a8da2e72ef12e69a3b35614b86057a2179512263d",
+      "website/content/docs/guides/deployments.mdx": "472201d40e0baef7fab2ea6a5d9f4fc0da0a8af54420cbc0946a568db1260a30",
+      "website/content/docs/guides/graph.mdx": "a2883b85ec9b1982a64e67ad3d016a3dd56678600d119339450cbc03c4730884",
+      "website/content/docs/guides/namespaces.mdx": "c515f7c077218f67a4c6f1d3db2d5066ce61cb1113b7a1679bd4ad46c743d5de"
+    }
+  },
+  "zenlev-migration-authoring": {
+    "reason": "Reviewed metadata exports, entry file hashing, and transaction context against migration and database contracts.",
+    "files": {
+      "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
+      "src/execution.ts": "4db87178cd26c823513a5481c055bf887a097ccd9dd5acfbc55fd887f00c2814",
+      "src/migrations.ts": "8250312e60504f3733c69dcc8cc142d0881ed7fdae18d0fc42e2baa6b729b583",
+      "src/types.ts": "9d71d92cca286c8f4d8b1150a785fae80b0cdf91d061d0d398082b837c7e9c33",
+      "website/content/docs/guides/_skills/zenlev-migration-authoring/SKILL.md": "bcb24d935d692b306062ce4ecf32f3412fcf9b9c2ec1a568f5b00c0fe0963000",
+      "website/content/docs/guides/migrations.mdx": "f28c99f690d20c725366ed73312b211d44c43fc05cb127b5bf114d36fbd85a53",
+      "website/content/docs/reference/commands.mdx": "0cb2261114b9178ac76599db80b33f3ba5367e7dc94306aedf3c222e0773f516"
+    }
+  },
+  "zenlev-recovery": {
+    "reason": "Reviewed rollback scope, guarded recovery, and forward-only baseline adoption against the ledger implementation.",
+    "files": {
+      "src/baseline.ts": "244161eb74d11722059a185b513a034c59c95c5d43f5fc9e9efca049859cf48c",
+      "src/rollback.ts": "45c71b6d9b991a949061ed1e3086d0b4261c06584431b9eb4acbc9b739301f42",
+      "src/store.ts": "1bcce0c022e1156bae75a879ab0d987a37942bef39368eec4393e896da240427",
+      "website/content/docs/guides/_skills/zenlev-recovery/SKILL.md": "3a445fbb70776100538f42a871164693a1e83244a664d264849ae709f831e0ee",
+      "website/content/docs/guides/baseline.mdx": "0b4d5365e925cc0d8642d16affdc46447eba9d1df3d220fe3e223b3aa74e5be8",
+      "website/content/docs/guides/rollback-recovery.mdx": "4568bb85e52302d90e47566d688b9b421562d073f4d3c3af857511383174965c",
+      "website/content/docs/reference/commands.mdx": "0cb2261114b9178ac76599db80b33f3ba5367e7dc94306aedf3c222e0773f516"
+    }
+  },
+  "zenlev-schema-diff": {
+    "reason": "Reviewed comparison and drop behavior against the schema loader, catalog readers, and diff implementation.",
+    "files": {
+      "src/schema-catalog.ts": "ba0ca2537ce6213a20c5512b52f754b6cbe6eebecdc9d2c0acddbfc45f9a30a3",
+      "src/schema-commands.ts": "32182ef6af5f813cdca6ac49002269ff47362ae12222dbc1869868a7fe8c45c0",
+      "src/schema-diff.ts": "9580654ca390d0df095792e72665ce80a3b12b7550db0b76972077c7452c34c8",
+      "src/schema-model.ts": "30e71d1029b62379d056404b91fb73ae1937264ef4311c73335bac1ac98215c5",
+      "website/content/docs/guides/_skills/zenlev-schema-diff/SKILL.md": "4f23de9dd8c7422f19c9675efa06efc05c654c5a12240bbb52ac6e7b72011410",
+      "website/content/docs/guides/schema-changes.mdx": "a86dd023e797c6ec300243838fb7b407f8222a4edcc1368ff836e91d76e67021",
+      "website/content/docs/reference/commands.mdx": "0cb2261114b9178ac76599db80b33f3ba5367e7dc94306aedf3c222e0773f516"
+    }
+  },
+  "zenlev-setup": {
+    "reason": "Reviewed factory ownership and configuration module resolution against the public contracts.",
+    "files": {
+      "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
+      "src/project-config.ts": "16d5efed2c047f52f0a21c27fdecfad1596a972c548f57085b5dcb1ccd4826c2",
+      "src/types.ts": "9d71d92cca286c8f4d8b1150a785fae80b0cdf91d061d0d398082b837c7e9c33",
+      "website/content/docs/guides/_skills/zenlev-setup/SKILL.md": "ded731d4b5a6f2a7f98db1d38415a7e50b227b80a56721836b7bc7f654021516",
+      "website/content/docs/guides/namespaces.mdx": "c515f7c077218f67a4c6f1d3db2d5066ce61cb1113b7a1679bd4ad46c743d5de",
+      "website/content/docs/reference/api.mdx": "bafe5108a57c596a7835f5b9061b6b54885fde170b4e1902bc30c7f68831013f",
+      "website/content/docs/reference/configuration.mdx": "778c272dac7a91ca881917c8a6aa0e87fb43a0d6d3208928201b8918edb8600d"
+    }
+  }
+}

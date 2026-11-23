@@ -1,5 +1,7 @@
 node_modules
 dist
+/skills/
+/.zenlev-skills-*/
 coverage/
 release-artifacts/
 test/.zenlev-*
