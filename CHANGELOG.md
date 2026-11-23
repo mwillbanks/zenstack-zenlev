@@ -6,17 +6,23 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-23
+
 ### Added
 
-- Add a versioned Zenlev plugin authoring skill for typed context, lifecycle hooks, and testing.
-- Ship versioned Agent Skills for setup, migration authoring, deployment planning, schema diffing, recovery, and plugins through TanStack Intent.
-- Summarize selected migrations, warnings, and blockers from a saved plan with the deployment skill's offline inspector.
-- Publish an agent setup guide, documentation sitemap, and `llms.txt`.
+- Ship six versioned Agent Skills through TanStack Intent. They cover setup, migration authoring, deployment planning, schema diffs, recovery, and plugins.
+- Bundle an offline inspector that summarizes selected migrations, blockers, and warnings from a saved JSON plan.
+- Publish an Agent Skills guide, documentation sitemap, `robots.txt`, and `llms.txt`.
 - Add GitHub forms for bug reports, feature requests, documentation improvements, and support questions.
 
 ### Changed
 
-- Upgrade the trace exporter to OpenTelemetry JavaScript SDK 3. The declared Node.js minimum is 22.15.
+- Expand installation and contributor guidance. Document when schema scaffolding writes to the ledger and how to verify exact recovery identities.
+- Upgrade to OpenTelemetry JavaScript SDK 3 and preserve environment-selected sampling and span limits. The declared Node.js minimum is 22.15.
+
+### Fixed
+
+- Publish the qualified npm tarball through GitHub Actions and support publication recovery from an existing release tag.
 
 ## [0.1.0] - 2026-11-23
 
