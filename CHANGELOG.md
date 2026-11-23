@@ -6,6 +6,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 
 ## [Unreleased]
 
+### Added
+
+- Add GitHub forms for bug reports, feature requests, documentation improvements, and support questions.
+
 ## [0.1.0] - 2026-11-23
 
 ### Added

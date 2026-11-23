@@ -28,7 +28,7 @@ Run `bun run verify:coverage` with `ZENLEV_TEST_POSTGRES_URL` and `ZENLEV_TEST_M
 
 Install documentation dependencies with `bun install --cwd website --frozen-lockfile`. Run `typecheck`, `lint`, `build`, and `verify:build` from `website`.
 
-GitHub requires a pull request and verified commit signatures for changes to `main`. Required checks cover Linux packaging, code quality, dialect integration and coverage, and the static documentation build. The coverage job attaches its LCOV report. CodeQL scans TypeScript and GitHub Actions.
+GitHub requires a pull request and verified commit signatures for changes to `main`. CI checks the changed paths on every pull request. Package changes run code quality, Linux packaging, and dialect integration with an LCOV report. Website changes run the static documentation checks. Repository Markdown and issue templates get lint checks. Manual CI runs validate everything. GitHub requires CodeQL results on every pull request. On pushes, CodeQL skips changes limited to prose or issue templates.
 
 ## Releases
 

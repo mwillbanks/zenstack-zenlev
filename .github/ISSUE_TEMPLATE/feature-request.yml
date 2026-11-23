@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a capability or behavior change for Zenlev.
+title: 'feat: '
+labels: [enhancement]
+body:
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for this proposal.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the migration, deployment, or recovery workflow and where the current behavior falls short.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Show what success would look like in a concrete example.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Areas affected
+      multiple: true
+      options:
+        - Migration authoring and dependency planning
+        - Apply, rollback, recovery, or baselines
+        - Schema diff or database dialects
+        - CLI and output
+        - API, adapters, or plugins
+        - Other
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and compatibility
+      description: Describe current workarounds and any effects on existing migrations, ledgers, or supported databases.

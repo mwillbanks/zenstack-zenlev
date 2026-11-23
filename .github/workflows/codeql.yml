@@ -5,6 +5,10 @@ on:
     branches: [main]
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - '.github/ISSUE_TEMPLATE/**'
   schedule:
     - cron: '32 8 * * 1'
 

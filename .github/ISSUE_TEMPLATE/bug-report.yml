@@ -1,0 +1,61 @@
+name: Bug report
+description: Report reproducible incorrect behavior in Zenlev.
+title: 'bug: '
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use a disposable database for reproductions. Remove credentials, connection strings, and production data from examples and logs.
+        [Report security vulnerabilities privately](https://github.com/mwillbanks/zenstack-zenlev/security/advisories/new).
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for this bug.
+          required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Include Zenlev, Bun, and ZenStack or Kysely versions.
+    validations:
+      required: true
+  - type: dropdown
+    id: dialect
+    attributes:
+      label: Database dialect
+      options:
+        - SQLite
+        - PostgreSQL
+        - MySQL
+        - Other
+        - No database involved
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include exact commands or API calls, setup steps, and the smallest example. For graph issues, include the relevant IDs, namespaces, dependency edges, and supersedes declarations.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include sanitized errors or output. If a migration ran, describe the resulting database and ledger state.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and additional context
+      description: Include the OS, database version, and whether you use a ZenStack client or standalone Kysely. For CLI display bugs, include the terminal and output mode.
