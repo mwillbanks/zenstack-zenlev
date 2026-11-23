@@ -1,0 +1,27 @@
+name: Documentation improvement
+description: Report missing, inaccurate, or confusing Zenlev documentation.
+title: 'docs: '
+labels: [documentation]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page or source
+      description: Link the published page or give its repository path.
+      placeholder: https://mwillbanks.github.io/zenstack-zenlev/docs
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is unclear or incorrect?
+      description: Describe what you were trying to do and where the documentation fell short.
+    validations:
+      required: true
+  - type: textarea
+    id: improvement
+    attributes:
+      label: Suggested improvement
+      description: Describe the explanation, example, or link that would help.
+    validations:
+      required: true

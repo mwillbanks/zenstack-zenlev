@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/mwillbanks/zenstack-zenlev/security/advisories/new
+    about: Send a private vulnerability report through GitHub Security Advisories.
+  - name: Zenlev documentation
+    url: https://mwillbanks.github.io/zenstack-zenlev/docs
+    about: Find setup guides, dialect examples, and the CLI and API references.

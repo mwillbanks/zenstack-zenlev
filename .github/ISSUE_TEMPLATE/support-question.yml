@@ -1,0 +1,35 @@
+name: Support question
+description: Ask for help using Zenlev in your project.
+title: 'support: '
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [Zenlev documentation](https://mwillbanks.github.io/zenstack-zenlev/docs) and existing issues first.
+        Remove credentials, connection strings, and production data from examples and logs.
+        [Report security vulnerabilities privately](https://github.com/mwillbanks/zenstack-zenlev/security/advisories/new).
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: Describe the migration workflow and where you need help.
+    validations:
+      required: true
+  - type: textarea
+    id: attempts
+    attributes:
+      label: What have you tried?
+      description: Include the commands or API calls, sanitized output, and relevant documentation links.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Versions and database
+      description: Include Zenlev, Bun, ZenStack or Kysely, and the database dialect and version when relevant.
+  - type: textarea
+    id: example
+    attributes:
+      label: Minimal example
+      description: Share a small configuration, migration, or dependency graph that illustrates the question.
