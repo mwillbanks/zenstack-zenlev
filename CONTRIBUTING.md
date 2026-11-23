@@ -30,6 +30,12 @@ Install documentation dependencies with `bun install --cwd website --frozen-lock
 
 GitHub requires a pull request and verified commit signatures for changes to `main`. CI checks the changed paths on every pull request. Package changes run code quality, Linux packaging, and dialect integration with an LCOV report. Website changes run the static documentation checks. Agent Skills and their declared sources run the skill review and validation checks. Repository Markdown and issue templates get lint checks. Manual CI runs validate everything. GitHub requires CodeQL results on every pull request. On pushes, CodeQL skips changes limited to prose or issue templates.
 
+## Agent Skill evaluation
+
+Follow the [Agent Skills specification](https://agentskills.io/specification) and [authoring guidance](https://agentskills.io/skill-creation/best-practices). Keep scope in the description and task decisions in the body. Use installed CLI commands when they cover the task. Bundle a dependency-free script when it removes a repeated, error-prone step.
+
+Use [skill-evaluations.json](test/fixtures/skill-evaluations.json) for manual agent qualification. Give a fresh agent the six names and descriptions for the routing prompts. Hide the expected selections. For each behavior prompt, give an independent agent the assigned skill and hide the rubric. Compare against the same prompt with the previous skill or without a skill. Check proposed commands against a disposable database where applicable. Record misses, revisions, and retest results in the pull request. Keep model calls outside deterministic CI.
+
 ## Releases
 
 Record user-visible changes under `[Unreleased]` in `CHANGELOG.md`. Keep entries focused on user impact. Write or update the corresponding release notes under `website/content/docs/releases/` when preparing a version.
