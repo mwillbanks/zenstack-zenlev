@@ -28,11 +28,11 @@ bun run zenlev db push --env staging --dry-run --sql --drop-missing-tables=skip
 bun run zenlev db push --env staging --create-migration --name align-schema --drop-missing-tables=skip --format
 ```
 
-Replace `staging` with the verified destination. Use `skip` to retain all tables absent from ZModel. Confirm the reviewed SQL omits their drops. Run the second command only when the user requests a file and the preview matches the intended changes. Use `apply` only when the operator authorizes the named drops. Declining a table also skips dependent drop operations. If the live plan changes after confirmation, stop and review the replacement plan.
+Replace `staging` with the verified destination. Use `skip` to retain all tables absent from ZModel. Confirm the reviewed SQL omits their drops. Run the second command only when the user requests a file, the preview matches the intended changes, and ledger writes are authorized. Use `apply` only when the operator authorizes the named drops. Declining a table also skips dependent drop operations. If the live plan changes after confirmation, stop and review the replacement plan.
 
 `db push` compares current ZModel against the live database. `migrate create --from-schema <path>` compares an earlier schema against the current ZModel; adding `--to-db` compares that source against the live database.
 
-`--sql` and `--dry-run` inspect without execution. `--create-migration` writes a file. Generated inverses exist only where semantics are known. Inspect generated handlers before application, especially destructive or data-dependent changes.
+`--sql` and `--dry-run` inspect without execution. `--create-migration` writes a file and takes a live ledger lock. It can initialize the ledger without applying application schema changes. Stop at preview when you have read-only access or authorization. Generated inverses exist only where semantics are known. Inspect generated handlers before application, especially destructive or data-dependent changes.
 
 Do not infer renames from similar names or invent unsupported rewrites. Zenlev excludes its ledger and Prisma bookkeeping; views are excluded by default. Continue to use `zen db pull` for introspection.
 

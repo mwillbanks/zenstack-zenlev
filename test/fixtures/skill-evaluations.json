@@ -131,7 +131,7 @@
       "expectations": [
         "Preview with db push --dry-run --sql and explicit --drop-missing-tables=skip on the verified destination.",
         "Verify ordered SQL keeps import_queue and its dependencies. Scaffold only after reviewing that set.",
-        "State that --create-migration writes a file without applying SQL. Test the file in disposable SQLite."
+        "State that --create-migration writes a file and can initialize or update the live ledger, without applying application schema SQL. Test the file in disposable SQLite."
       ]
     },
     {
@@ -157,7 +157,7 @@
       "prompt": "An interrupted MySQL migration ran on billing-staging. The owner process is gone and it left an unresolved attempt. The new table exists but most rows were never copied. The default config points elsewhere. Explain what to inspect, whether retry or applied is justified, and give the exact command templates including the affected database. If a downstream active migration needs reversing too, explain the preview command and whether it edits database state.",
       "expectations": [
         "Include --env billing-staging in recovery and rollback templates.",
-        "Account for the database session and observed owner token. Require complete effects for applied and verified repeatability for retry.",
+        "Get the owner and attempt ID through authorized read-only ledger access. Account for the previous database session. Require complete effects for applied and verified repeatability for retry.",
         "Preview cascade without writes. Distinguish generation from database reversal."
       ]
     }

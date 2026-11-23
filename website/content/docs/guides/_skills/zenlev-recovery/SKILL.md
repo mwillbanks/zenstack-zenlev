@@ -40,9 +40,9 @@ Rollback generates a new superseding migration; it does not immediately reverse 
 
 ## Reconcile an interrupted operation
 
-Record the observed owner token or attempt ID and inspect partial effects. Confirm the prior runner and its database session ended before releasing its lock; lock age is insufficient.
+Use an authorized read-only database connection to the verified destination. Read `owner` in the configured lock table or `attempt_id` for the affected migration in the configured migrations table. See [ledger inspection](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/rollback-recovery#inspect-recovery-identities) for default names. Stop if you cannot verify the current identity. Inspect partial effects. Confirm the prior runner and its database session ended before releasing its lock; lock age is insufficient.
 
-Use `bun run zenlev migrate recover --env staging` with `--actor`, `--reason`, and `--evidence`:
+Use `bun run zenlev migrate recover --env staging` with `--actor`, `--reason`, and `--evidence`. Keep secrets and application data out of the audit text.
 
 - `--action release-lock --owner <observed-owner>` releases that exact owner.
 - `--action applied --id <id> --attempt-id <observed-attempt>` requires evidence that all intended effects exist.

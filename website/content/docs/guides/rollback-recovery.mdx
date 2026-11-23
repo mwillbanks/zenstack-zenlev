@@ -31,6 +31,17 @@ A destination where an entry never applied skips its reversal. A cascade stops i
 
 The rollback `--namespace` option sets the generated file's namespace. The target ID identifies the migration to reverse across the ledger.
 
+## Inspect recovery identities
+
+Verify the affected destination and use its environment name throughout recovery. Use `migrate status --json` to identify the affected migration. Read the exact recovery identities through authorized read-only ledger access.
+
+| Dialect              | Lock table              | Migrations table    |
+| -------------------- | ----------------------- | ------------------- |
+| SQLite               | `zenlev_lock`           | `zenlev_migrations` |
+| PostgreSQL and MySQL | `zenlev.migration_lock` | `zenlev.migrations` |
+
+These are the default names. Use the project's [ledger location overrides](./reference/configuration) when configured. Read `owner` from the row with `lock_id = 'zenlev'`. Read `attempt_id` and `unresolved` from the migration row with the affected `id`. Stop if you cannot verify the exact owner or attempt required for the action.
+
 ## Non-transactional failures
 
 MySQL DDL and explicitly non-transactional runs can leave partial database changes. Zenlev records the attempt before execution and keeps unresolved attempts blocked.
@@ -38,7 +49,7 @@ MySQL DDL and explicitly non-transactional runs can leave partial database chang
 1. Inspect the failed migration and its observed attempt ID.
 2. Inspect affected database objects and rows.
 3. Reconcile the actual effects with the intended handler outcome.
-4. Record an actor, reason, and evidence.
+4. Record an actor, reason, and evidence. Keep secrets and application data out of the audit text.
 5. Mark the attempt applied or eligible to retry.
 
 The recovery operation checks the observed attempt ID. A changed attempt requires a new inspection.

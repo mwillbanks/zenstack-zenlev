@@ -36,26 +36,26 @@
     }
   },
   "zenlev-recovery": {
-    "reason": "Checked the recovery flags, recorded identities, partial effects, rollback modes, and baseline adoption. Retested destination selection when the configured default points elsewhere.",
+    "reason": "Checked exact ledger names, owner and attempt fields, CLI flags, and partial effects. An independent retest used the affected environment for recovery and cascade and withheld recovery without verified evidence.",
     "files": {
       "src/baseline.ts": "244161eb74d11722059a185b513a034c59c95c5d43f5fc9e9efca049859cf48c",
       "src/rollback.ts": "45c71b6d9b991a949061ed1e3086d0b4261c06584431b9eb4acbc9b739301f42",
       "src/store.ts": "1bcce0c022e1156bae75a879ab0d987a37942bef39368eec4393e896da240427",
-      "website/content/docs/guides/_skills/zenlev-recovery/SKILL.md": "995acff53ccc2e2fd675c84b7b3742c54683fca3c29ba9851c57ba93d7a259c7",
+      "website/content/docs/guides/_skills/zenlev-recovery/SKILL.md": "3781d2e2c3a6f382070c3c25f774585d8cf80242cd0a6bd4879c20f0223c9639",
       "website/content/docs/guides/baseline.mdx": "0b4d5365e925cc0d8642d16affdc46447eba9d1df3d220fe3e223b3aa74e5be8",
-      "website/content/docs/guides/rollback-recovery.mdx": "4568bb85e52302d90e47566d688b9b421562d073f4d3c3af857511383174965c",
+      "website/content/docs/guides/rollback-recovery.mdx": "2d95722247bc1c724b1a95ee44c3e2f5f43be394b49e2a34ce9232a1bfd9a664",
       "website/content/docs/reference/commands.mdx": "0cb2261114b9178ac76599db80b33f3ba5367e7dc94306aedf3c222e0773f516"
     }
   },
   "zenlev-schema-diff": {
-    "reason": "Checked comparison direction, inspection and file generation against schema commands. A blind assessment used explicit skip and waited for SQL review before scaffolding.",
+    "reason": "Confirmed the preview and file generation commands, explicit table retention, and write authorization. Independent review traced the generation path to live ledger initialization and locking.",
     "files": {
       "src/schema-catalog.ts": "ba0ca2537ce6213a20c5512b52f754b6cbe6eebecdc9d2c0acddbfc45f9a30a3",
       "src/schema-commands.ts": "32182ef6af5f813cdca6ac49002269ff47362ae12222dbc1869868a7fe8c45c0",
       "src/schema-diff.ts": "9580654ca390d0df095792e72665ce80a3b12b7550db0b76972077c7452c34c8",
       "src/schema-model.ts": "30e71d1029b62379d056404b91fb73ae1937264ef4311c73335bac1ac98215c5",
-      "website/content/docs/guides/_skills/zenlev-schema-diff/SKILL.md": "92bb9e55e55d6eda1b563cb12604c5dff9abc2d2049c48fa73e1e0c5e11a1087",
-      "website/content/docs/guides/schema-changes.mdx": "a86dd023e797c6ec300243838fb7b407f8222a4edcc1368ff836e91d76e67021",
+      "website/content/docs/guides/_skills/zenlev-schema-diff/SKILL.md": "db03157467466035003ec2bb66262b4f420d2a9ba29a7f537b23e6a51b0091b4",
+      "website/content/docs/guides/schema-changes.mdx": "3bcf517c2acab1c524c883e2d92ed2192a01bae1e33bad37a603d462c323ced7",
       "website/content/docs/reference/commands.mdx": "0cb2261114b9178ac76599db80b33f3ba5367e7dc94306aedf3c222e0773f516"
     }
   },
