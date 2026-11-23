@@ -1,5 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "pull-request-title-pattern": "chore: release Zenlev ${version}",
+  "pull-request-header": "## Zenlev release candidate",
+  "pull-request-footer": "Before merging, review the changelog, versioned documentation, and required checks. Merging publishes the qualified package to npm through GitHub Actions.",
   "packages": {
     ".": {
       "release-type": "node",
