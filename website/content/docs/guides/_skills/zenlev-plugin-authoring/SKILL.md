@@ -1,16 +1,18 @@
 ---
 name: zenlev-plugin-authoring
-description: Create and test a Zenlev lifecycle plugin with typed context, command or migration checks, plan hooks, or audit observers. Use for extending Zenlev behavior through definePlugin.
+description: Use when writing a Zenlev lifecycle plugin for policy, typed migration context, plan validation, audit events, or hook errors. Covers definePlugin, registration, vetoes, preview safety, and observer failures after commit.
+license: MIT
+compatibility: Requires Bun and an installed Zenlev package.
 metadata:
   type: core
   library: '@mwillbanks/zenstack-zenlev'
-sources:
-  - website/content/docs/reference/plugins-telemetry.mdx
-  - website/content/docs/reference/api.mdx
-  - src/engine.ts
-  - src/execution.ts
-  - src/plugins.ts
-  - src/types.ts
+  zenlev_sources: |-
+    website/content/docs/reference/plugins-telemetry.mdx
+    website/content/docs/reference/api.mdx
+    src/engine.ts
+    src/execution.ts
+    src/plugins.ts
+    src/types.ts
 ---
 
 # Author a Zenlev lifecycle plugin
@@ -43,8 +45,8 @@ Register the exported plugin with your existing client or adapter. The sample ob
 
 - Before hooks may return `false` to abort their operation. Command and plan hooks can run for previews. Keep them free of writes and external effects.
 - An `onPlan` hook receives a copy. Return a valid replacement to narrow eligible work. Keep prerequisites, migration identities, transaction mode, and warnings intact. Declare prerequisites in migration metadata.
-- Command context may have no database. Before-migration hooks receive the execution context. After-migration hooks observe the result using a root context. Avoid using after hooks for changes that must commit with the migration.
-- Observer errors can be reported after a commit. Check the result and ledger before retrying. Never place credentials, SQL parameters, or user data in telemetry attributes.
+- Command context may have no database. Before-migration hooks receive the execution context. After-migration hooks observe the result using a root context. Put changes that must commit with the migration in its handler.
+- Observer errors can be reported after a commit. Inspect the command result and run `bun run zenlev migrate status --env staging --json` with the original environment. If the ledger shows the migration applied, reconcile the missing audit event separately. Never place credentials, SQL parameters, or user data in telemetry attributes.
 
 ## Verify in a disposable project
 

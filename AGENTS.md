@@ -52,7 +52,7 @@ When preparing a release, curate the shipped entries under the version heading. 
 
 ## Agent Skills
 
-Edit canonical skills under `website/content/docs/guides/_skills/`. List the docs and implementation paths that support each skill. For a new skill, update the consumer guide and pack inventory.
+Edit canonical skills under `website/content/docs/guides/_skills/`. List the supporting docs and implementation paths in `metadata.zenlev_sources`, one path per line. Use standard Agent Skills frontmatter. Keep optional Bun scripts in `scripts/`. Staging fingerprints and ships those scripts with the skill. For a new skill, update the consumer guide and pack inventory.
 
 After reviewing changed guidance or a declared source, run `bun run skills:review <skill> "<reason>"` and apply the resulting JSON to `skills-review.json`. Explain what you checked. Build and CI verify the record and stage skills with the package version.
 

@@ -1,16 +1,18 @@
 ---
 name: zenlev-migration-authoring
-description: Write or review TypeScript Zenlev migrations, including metadata, dependency IDs, entry-file hashes, transactional context, and truthful down handlers. Use when changing migration code.
+description: Use when writing or reviewing a Zenlev migration file, adding a cross-stage dependency, designing a backfill or down handler, or investigating an edited migration's hash. Covers TypeScript metadata, transaction-scoped database access, and reversible changes.
+license: MIT
+compatibility: Requires Bun and an installed Zenlev package.
 metadata:
   type: core
   library: '@mwillbanks/zenstack-zenlev'
-sources:
-  - website/content/docs/guides/migrations.mdx
-  - website/content/docs/reference/commands.mdx
-  - src/migrations.ts
-  - src/database.ts
-  - src/execution.ts
-  - src/types.ts
+  zenlev_sources: |-
+    website/content/docs/guides/migrations.mdx
+    website/content/docs/reference/commands.mdx
+    src/migrations.ts
+    src/database.ts
+    src/execution.ts
+    src/types.ts
 ---
 
 # Author a migration with explicit prerequisites
@@ -19,10 +21,10 @@ sources:
 2. Scaffold with the CLI. Preserve the generated CUID2 identity and UTC creation timestamp.
 3. Export `meta` and `up`; export `down` only when reversal semantics are known. Match metadata identity to the filename.
 4. Declare actual prerequisites in `meta.dependsOn`. Namespace names and filename order do not create edges.
-5. Use the migration context for database work. Inspect the plan and test application and any reversal on a disposable database.
+5. When expansion already ran, keep its bytes and scaffold a separate backfill that depends on the expansion ID. Test both a fresh install and a database with the expansion already applied.
 
 ```sh
-bun run zenlev migrate create --empty --name add-account-status --namespace pre-deploy
+bun run zenlev migrate create --empty --name backfill-account-status --namespace deploy
 bun run zenlev migrate apply --plan-only --json
 ```
 

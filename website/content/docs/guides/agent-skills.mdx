@@ -91,6 +91,8 @@ npx --no-install intent load '@mwillbanks/zenstack-zenlev#zenlev-deployment-plan
 
 For example, ask your agent to inspect a pre-deploy → deploy → post-deploy graph. Load deployment planning first. The agent should preview each namespace and report an excluded pending prerequisite as a blocker. Load migration authoring only if the task also requires new migration code.
 
+Deployment planning includes an optional Bun script, `scripts/check-plan.ts`, beside the loaded skill. Review the script before running it on saved `--plan-only --json` output. It reads the supplied JSON and summarizes selection, blockers, and warnings without opening a database connection.
+
 A successful load returns guidance. It does not prove that the agent selected the right skill or followed it. Verify the proposed commands, plan, and database evidence.
 
 ## Add agent discovery guidance
