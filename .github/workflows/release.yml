@@ -147,7 +147,7 @@ jobs:
 
   publish:
     needs: qualify
-    if: ${{ needs.qualify.outputs.publish == 'true' && (github.event_name == 'push' || !inputs.dry_run) }}
+    if: ${{ !cancelled() && needs.qualify.result == 'success' && needs.qualify.outputs.publish == 'true' && (github.event_name == 'push' || !inputs.dry_run) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
