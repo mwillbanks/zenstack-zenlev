@@ -35,18 +35,19 @@ The real apply rebuilds its plan under the ledger lock. The preview is a review 
 
 ## Command methods
 
-| Method               | Main input                                           | Result                                        |
-| -------------------- | ---------------------------------------------------- | --------------------------------------------- |
-| `db.push()`          | Inspection, generation, and drop options             | Change set, status, and optional migration    |
-| `migrate.create()`   | Name, namespace, dependencies, and source comparison | Migration identity                            |
-| `migrate.apply()`    | Selection and transaction options                    | Plan and per-migration outcomes               |
-| `migrate.status()`   | Namespace and integrity filters                      | Status entries                                |
-| `migrate.tree()`     | Namespace, format, and supersedes options            | Text or Mermaid string                        |
-| `migrate.rollback()` | Target ID and explicit mode                          | Reversal set and optional generated migration |
-| `migrate.remove()`   | IDs or scope, preview, and confirmation              | Selected migration identities                 |
-| `migrate.resolve()`  | ID, optional current hash, actor, and reason         | Accepted current hash                         |
-| `migrate.reshape()`  | ID and accepted hash to add or drop                  | Hash update                                   |
-| `migrate.recover()`  | Exact observed lock or attempt and evidence          | Completion                                    |
+| Method               | Main input                                               | Result                                           |
+| -------------------- | -------------------------------------------------------- | ------------------------------------------------ |
+| `db.push()`          | Inspection, generation, and drop options                 | Change set, status, and optional migration       |
+| `migrate.create()`   | Name, namespace, dependencies, and source comparison     | Migration identity                               |
+| `migrate.apply()`    | Selection and transaction options                        | Plan and per-migration outcomes                  |
+| `migrate.status()`   | Namespace and integrity filters                          | Status entries                                   |
+| `migrate.tree()`     | Namespace, format, and supersedes options                | Text or Mermaid string                           |
+| `migrate.rollback()` | Target ID and explicit mode                              | Reversal set and optional generated migration    |
+| `migrate.squash()`   | Optional name, namespace, SQL snapshot path, and dry run | Covered IDs, SQL, and optional baseline identity |
+| `migrate.remove()`   | IDs or scope, preview, and confirmation                  | Selected migration identities                    |
+| `migrate.resolve()`  | ID, optional current hash, actor, and reason             | Accepted current hash                            |
+| `migrate.reshape()`  | ID and accepted hash to add or drop                      | Hash update                                      |
+| `migrate.recover()`  | Exact observed lock or attempt and evidence              | Completion                                       |
 
 CLI comma-separated lists become arrays in API options. Apply, status, and tree use `namespace: ['predeploy', 'deploy']`. Authoring uses one `namespace` string.
 

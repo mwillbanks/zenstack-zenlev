@@ -8,6 +8,7 @@ import type { PushResult } from './schema-commands'
 import type { StatusEntry } from './inspection'
 import type { CreateOptions, RemoveOptions, StatusOptions, TreeOptions } from './inspection'
 import type { RollbackOptions } from './rollback'
+import type { SquashOptions } from './baseline'
 import type { ResolveOptions, ReshapeOptions } from './execution'
 import type { RecoveryOptions } from './store'
 
@@ -62,6 +63,7 @@ const commandFlags = {
     'continue-on-failure',
   ],
   'migrate rollback': ['id', 'namespace', 'name', 'dry-run', 'format', 'cascade', 'compensate'],
+  'migrate squash': ['name', 'namespace', 'snapshot', 'dry-run', 'format'],
   'migrate status': ['namespace', 'mismatched-only', 'show-resolved'],
   'migrate tree': ['namespace', 'format', 'show-supersedes'],
   'migrate remove': ['id', 'namespace', 'all', 'dry-run', 'force'],
@@ -92,6 +94,7 @@ const stringFlags = new Set([
   'owner',
   'attempt-id',
   'evidence',
+  'snapshot',
 ])
 const camel = (name: string) =>
   name.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
@@ -242,7 +245,7 @@ export const helpText = `Usage: zenlev <command> [options]
 
 Commands
   db push
-  migrate create | apply | rollback | status | tree | remove | reshape | resolve | recover
+  migrate create | apply | rollback | status | tree | remove | reshape | resolve | recover | squash
 
 Global options
   --config <path>  --cwd <path>  --env <name>  --schema <path>
@@ -379,6 +382,8 @@ async function invoke(
       return client.migrate.apply(options as ApplyOptions)
     case 'migrate rollback':
       return client.migrate.rollback(options as unknown as RollbackOptions)
+    case 'migrate squash':
+      return client.migrate.squash(options as SquashOptions)
     case 'migrate status':
       return client.migrate.status(options as StatusOptions)
     case 'migrate tree':

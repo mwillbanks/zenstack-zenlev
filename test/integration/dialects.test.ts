@@ -8,6 +8,7 @@ import { createPool } from 'mysql2'
 import { Pool } from 'pg'
 import { createZenlev, createZenStackAdapter, type Zenlev } from '../../src'
 import { createStore } from '../../src/store'
+import { authorMigration } from '../../src/migrations'
 import { alignCatalogSchema, readCatalog } from '../../src/schema-catalog'
 import { loadSchemaModel } from '../../src/schema-model'
 import type { Dialect, MigrationMeta } from '../../src/types'
@@ -222,6 +223,75 @@ for (const dialect of ['postgresql', 'mysql'] as const) {
         }
       },
     )
+
+    test.skipIf(dialect !== 'mysql')(
+      'widens legacy MySQL ledger metadata for a large baseline',
+      async () => {
+        const f = fixture!
+        const store = createStore(createZenStackAdapter(f.client))
+        await migration(f, 'oldroot', 'void ctx')
+        await f.zenlev.migrate.apply()
+        const [root] = await store.read()
+        const { rows: columns } = await sql<{ column_type: string }>`
+        SELECT DATA_TYPE AS column_type FROM information_schema.columns
+        WHERE table_schema = 'zenlev' AND table_name = 'migrations' AND column_name = 'meta'
+      `.execute(f.client.$qbRaw)
+        expect(columns[0]?.column_type).toBe('longtext')
+        await sql`ALTER TABLE zenlev.migrations MODIFY COLUMN meta TEXT NOT NULL`.execute(
+          f.client.$qbRaw,
+        )
+        const archived = Array.from(
+          { length: 1450 },
+          (_, index) => 'archived' + index.toString().padStart(24, '0'),
+        )
+        const base = await authorMigration(resolve(f.cwd, 'migrations'), {
+          name: 'large_baseline',
+          supersedes: ['oldroot', ...archived],
+          baseline: {
+            dialect,
+            history: [
+              { id: 'oldroot', expected: { status: 'applied', hash: root!.hash } },
+              ...archived.map((id) => ({ id, expected: null })),
+            ],
+          },
+        })
+        expect((await f.zenlev.migrate.apply({ only: [base.id] })).status).toBe('ok')
+        expect(
+          (await store.read()).find(({ meta }) => meta.id === base.id)?.meta.supersedes,
+        ).toHaveLength(1451)
+      },
+    )
+
+    test('adopts and bootstraps a reviewed baseline on the configured client', async () => {
+      const f = fixture!
+      const ddl = 'CREATE TABLE ' + markerTable + ' (id INTEGER PRIMARY KEY)'
+      await migration(
+        f,
+        'oldroot',
+        "await ctx.db.schema.createTable('" +
+          markerTable +
+          "').addColumn('id', 'integer', (column) => column.primaryKey()).execute()",
+      )
+      expect((await f.zenlev.migrate.apply()).status).toBe('ok')
+      await expect(f.zenlev.migrate.squash({ dryRun: true })).rejects.toThrow('Pass --snapshot')
+      await Bun.write(
+        resolve(f.cwd, 'bootstrap.json'),
+        JSON.stringify([ddl, 'INSERT INTO ' + markerTable + ' (id) VALUES (1)']),
+      )
+      const { migration: baseline } = await f.zenlev.migrate.squash({ snapshot: 'bootstrap.json' })
+      expect((await f.zenlev.migrate.apply({ only: [baseline!.id] })).status).toBe('ok')
+      const list = () => f.client.$qbRaw.selectFrom(markerTable).selectAll().execute()
+      expect(await list()).toEqual([])
+
+      await cleanDatabase(f.client, dialect)
+      await rm(resolve(f.cwd, 'migrations/oldroot_oldroot.ts'))
+      expect((await f.zenlev.migrate.apply()).migrations.map(({ id }) => id)).toEqual([
+        baseline!.id,
+      ])
+      expect(await list()).toEqual([{ id: 1 }])
+      const store = createStore(createZenStackAdapter(f.client))
+      expect(await store.read()).toHaveLength(1)
+    })
 
     test('pushes mapped tables, defaults, indexes and foreign keys and then produces no diff', async () => {
       const f = fixture!

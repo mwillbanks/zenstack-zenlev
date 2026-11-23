@@ -57,6 +57,12 @@ For status, `--namespace` filters cohorts, `--mismatched-only` shows integrity p
 
 For tree, choose `--format text|mermaid` and optionally `--show-supersedes`. The `--namespace` filter accepts comma-separated values.
 
+### Squash to a baseline
+
+Use `migrate squash --dry-run` to preview the covered IDs and bootstrap SQL. Use `migrate squash --name <name> --format` to create the migration. `--namespace <name>` selects its namespace. `--snapshot <path>` supplies a JSON array of SQL statements relative to the project directory.
+
+Existing environments record the baseline when their history matches. New environments execute its SQL on apply. See [Squash migration history](./guides/baseline) for the rollout and archival sequence.
+
 ### Transaction controls
 
 Apply uses a shared transaction on transactional DDL dialects by default. `--no-transaction` chooses durable per-attempt recording.

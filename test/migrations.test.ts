@@ -138,6 +138,19 @@ describe('migration discovery', () => {
     })
   })
 
+  test.each([
+    { dialect: 'unsupported', history: [] },
+    { dialect: 'sqlite', history: [{ id: 'missing', expected: null }] },
+    { dialect: 'sqlite', history: [{ id: secondId, expected: null }] },
+    {
+      dialect: 'sqlite',
+      history: [{ id: secondId, expected: { status: 'applied', hash: 'bad' } }],
+    },
+  ])('rejects invalid baseline manifests %#', async (baseline) => {
+    await fixture(metadata({ baseline, supersedes: [secondId] }))
+    await expect(discoverMigrations(directory)).rejects.toThrow('Migration baseline requires')
+  })
+
   test('reloads updated source using its content hash', async () => {
     await fixture(metadata(), {
       handlers: 'export function up(ctx) { ctx.reporter.info("first") }',

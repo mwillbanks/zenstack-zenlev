@@ -21,6 +21,7 @@ export type {
   TreeOptions,
 } from './inspection'
 export type { RollbackOptions, RollbackResult } from './rollback'
+export type { SquashOptions, SquashResult } from './baseline'
 export type { RecoveryOptions } from './store'
 export type { PushOptions, PushResult } from './schema-commands'
 export type * from './types'

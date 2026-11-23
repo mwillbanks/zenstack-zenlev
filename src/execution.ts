@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { CommandContext } from './engine'
-import { buildGraph, planMigrations, type MigrationGraph } from './graph'
+import { baselineMode, buildGraph, planMigrations, type MigrationGraph } from './graph'
 import { discoverMigrations, verifyMigrationFile, type LoadedMigration } from './migrations'
 import { createStore, type MigrationStore, type RecoveryOptions } from './store'
-import { activeDependentIds, verifyReversals } from './rollback'
+import { activeDependentIds, assertReversibleHistory, verifyReversals } from './rollback'
 import { operationWarnings } from './warnings'
 import type {
   ApplyOptions,
@@ -95,7 +95,7 @@ export async function apply(
         local.map(({ up: _up, down: _down, ...identity }) => identity),
         history,
       )
-      const original = planMigrations(graph, options, adapter.transactionalDdl)
+      const original = planMigrations(graph, options, adapter.transactionalDdl, adapter.dialect)
       const initial =
         adapter.dialect === 'mysql' && original.migrations.length > 0
           ? {
@@ -127,6 +127,9 @@ export async function apply(
     for (const warning of plan.warnings) {
       context.notifyWarning(warning)
       await plugins.warning(warning)
+    }
+    for (const migration of plan.migrations) {
+      if (migration.baseline) await store.accommodateBaseline(owner, migration)
     }
     const results: MigrationResult[] = []
     const reversed: MigrationIdentity[] = []
@@ -188,7 +191,9 @@ export async function apply(
             for (const reversal of reversals) {
               await reversal.down!(plugins.scope(migrationContext(session, reversal, true)))
             }
-            await migration.up(plugins.scope(scoped))
+            if (!migration.baseline || baselineMode(graph, migration) === 'bootstrap') {
+              await migration.up(plugins.scope(scoped))
+            }
           })
           const durationMs = elapsed(now, start)
           await store.apply(
@@ -259,6 +264,7 @@ async function loadReversals(
 ): Promise<LoadedMigration[]> {
   if (!migration.rollback) return []
   const { mode, target, reversals } = migration.rollback
+  for (const id of reversals) assertReversibleHistory(graph, id)
   const active = activeDependentIds(graph, target)
   if (mode === 'cascade' && active.some((id) => !reversals.includes(id))) {
     throw new Error(

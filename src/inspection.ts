@@ -12,7 +12,7 @@ import type { MigrationIdentity, MigrationStatus } from './types'
 
 export type CreateOptions = Omit<
   AuthorMigrationInput,
-  'hashing' | 'upBody' | 'downBody' | 'rollback'
+  'hashing' | 'upBody' | 'downBody' | 'rollback' | 'baseline'
 > & {
   readonly empty?: boolean
   readonly fromSchema?: string

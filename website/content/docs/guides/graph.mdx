@@ -3,9 +3,11 @@ title: 'Dependency graph'
 description: 'Choose eligible work while retaining explicit prerequisites.'
 ---
 
+import { SupersedesGraph } from '../../../src/components/history-diagrams'
+
 `dependsOn` forms a directed acyclic graph. Each edge states that one change must complete before another becomes eligible. Independent changes can reach different deployment windows without assigning every file one global sequence.
 
-Every referenced ID must exist locally or in stored history. Zenlev validates the effective graph after supersedes rewriting.
+Every referenced ID must exist locally, in stored history, or in a [baseline](./guides/baseline) that covers it. Zenlev validates the effective graph after supersedes rewriting.
 
 ## Selection
 
@@ -44,6 +46,8 @@ A plan is an inspection of current state. A real apply acquires the ledger lock,
 ## Supersedes
 
 Superseding migrations replace future graph edges without rewriting the historical record. References follow supersedes transitively. Creation time chooses among competing superseders, followed by lexical ID for equal timestamps.
+
+<SupersedesGraph />
 
 Use this when a reviewed migration replaces an earlier definition or when generated compensation needs to become the current graph node. Supersedes metadata expresses graph replacement. Its migration handler must still perform the intended database work.
 

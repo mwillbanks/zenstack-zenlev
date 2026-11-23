@@ -122,28 +122,66 @@ body {
   width: 100%;
   height: auto;
 }
-.graph-node circle {
+.deployment-surface,
+.deployment-lane,
+.deployment-node rect {
+  stroke: var(--color-fd-border);
+}
+.deployment-surface {
+  fill: var(--color-fd-card);
+}
+.deployment-lane {
+  fill: var(--color-fd-muted);
+}
+.deployment-node rect {
   fill: var(--color-fd-background);
+}
+.deployment-node text,
+.deployment-label {
+  fill: var(--color-fd-foreground);
+  font-size: 15px;
+  font-weight: 650;
+}
+.deployment-stage {
+  fill: var(--color-fd-foreground);
+  font:
+    14px ui-monospace,
+    monospace;
+}
+.deployment-kicker,
+.deployment-note {
+  fill: var(--color-fd-muted-foreground);
+  font-size: 14px;
+}
+.deployment-kicker {
+  font-size: 12px;
+  letter-spacing: 0.13em;
+}
+.deployment-node.replacement rect {
   stroke: var(--zenlev-accent);
   stroke-width: 2;
 }
-.graph-label {
+.deployment-node.archived rect,
+.deployment-replacement {
+  stroke-dasharray: 5 4;
+}
+.deployment-node.archived text {
   fill: var(--color-fd-muted-foreground);
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
+}
+.deployment-edge,
+.deployment-replacement {
+  fill: none;
+  stroke: var(--color-fd-muted-foreground);
+  stroke-width: 2;
+}
+.deployment-replacement {
+  stroke: var(--zenlev-accent);
 }
 .graph-caption {
+  margin-top: 0.9rem;
   text-align: center;
   color: var(--color-fd-muted-foreground);
-  font-size: 0.75rem;
-}
-.status-dot {
-  display: inline-block;
-  width: 0.4rem;
-  height: 0.4rem;
-  margin-right: 0.4rem;
-  background: var(--zenlev-accent);
-  border-radius: 50%;
+  font-size: 0.84rem;
 }
 .principles {
   display: grid;

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Kysely } from 'kysely'
 import {
@@ -82,6 +82,215 @@ test('previews, applies and inspects a scoped dependency chain', async () => {
     'applied',
   ])
   expect((await zenlev.migrate.apply()).migrations).toEqual([])
+})
+
+async function stagedGraph() {
+  const insert = (id: number) =>
+    "await ctx.db.kysely.insertInto('accounts').values({ id: " + id + ' }).execute()'
+  const remove = (id: number) =>
+    "await ctx.db.kysely.deleteFrom('accounts').where('id', '=', " + id + ').execute()'
+  await migration('alpha', createAccounts, dropAccounts, { namespace: 'pre-deploy' })
+  await migration('bravo', insert(1), remove(1), {
+    namespace: 'deploy',
+    dependsOn: ['alpha'],
+  })
+  await migration('charlie', insert(2), remove(2), {
+    namespace: 'pre-deploy',
+    dependsOn: ['alpha'],
+  })
+  await migration('delta', insert(3), remove(3), {
+    namespace: 'post-deploy',
+    dependsOn: ['bravo', 'charlie'],
+  })
+  await migration(
+    'echo',
+    "await ctx.db.schema.createTable('independent').addColumn('id','integer').execute()",
+    undefined,
+    { namespace: 'post-deploy' },
+  )
+}
+
+test.each(['cascade', 'compensate'] as const)(
+  'checks cross-namespace dependencies and applies a %s rollback',
+  async (mode) => {
+    await stagedGraph()
+    const early = await zenlev.migrate.apply({ namespace: ['post-deploy'], dryRun: true })
+    expect(early.plan.blockers.filter(({ migrationId }) => migrationId === 'delta')).toHaveLength(2)
+    expect(exists('zenlev_migrations')).toBe(false)
+    expect(
+      (await zenlev.migrate.apply({ namespace: ['pre-deploy'] })).migrations.map(({ id }) => id),
+    ).toEqual(['alpha', 'charlie'])
+    const blocked = await zenlev.migrate.apply({ namespace: ['post-deploy'] })
+    expect(blocked.status).toBe('failed')
+    expect(blocked.plan.blockers).toHaveLength(1)
+    expect(exists('independent')).toBe(false)
+    expect((await zenlev.migrate.apply({ namespace: ['deploy'] })).status).toBe('ok')
+    expect((await zenlev.migrate.apply({ namespace: ['post-deploy'] })).status).toBe('ok')
+
+    const rollback = await zenlev.migrate.rollback({ id: 'bravo', mode, namespace: 'post-deploy' })
+    expect(rollback.reversals).toEqual(mode === 'cascade' ? ['delta', 'bravo'] : ['bravo'])
+    expect(rollback.warnings.map(({ code }) => code)).toEqual(
+      mode === 'cascade' ? [] : ['ACTIVE_DEPENDENTS'],
+    )
+    expect((await zenlev.migrate.apply({ only: [rollback.migration!.id] })).status).toBe('ok')
+    expect(raw.query('SELECT id FROM accounts ORDER BY id').values()).toEqual(
+      mode === 'cascade' ? [[2]] : [[2], [3]],
+    )
+    expect(exists('independent')).toBe(true)
+    expect(
+      (await createStore(adapter).read())
+        .filter(({ status }) => status === 'rolled_back')
+        .map(({ meta }) => meta.id),
+    ).toEqual(mode === 'cascade' ? ['bravo', 'delta'] : ['bravo'])
+  },
+)
+
+test('redirects an old dependency through a winning transitive supersedes chain', async () => {
+  await stagedGraph()
+  await zenlev.migrate.apply({ namespace: ['pre-deploy'] })
+  await migration('first', "throw new Error('superseded handler')", undefined, {
+    namespace: 'deploy',
+    supersedes: ['bravo'],
+  })
+  await migration('newest', addAccount, removeAccount, {
+    namespace: 'deploy',
+    dependsOn: ['alpha'],
+    supersedes: ['first'],
+    createdAt: '2026-11-24T00:00:00.000Z',
+  })
+  await migration('older', "throw new Error('losing handler')", undefined, {
+    namespace: 'deploy',
+    supersedes: ['first', 'olderparent'],
+  })
+  await migration('olderparent', "throw new Error('replaced parent')")
+  await migration('last', "throw new Error('unselected migration')")
+  const plan = await zenlev.migrate.apply({ namespace: ['post-deploy'], planOnly: true })
+  expect(plan.plan.blockers[0]?.message).toContain('requires pending migration newest')
+  const target = await zenlev.migrate.apply({ only: ['bravo'] })
+  expect(target.migrations.map(({ id }) => id)).toEqual(['newest'])
+  expect((await zenlev.migrate.apply({ only: ['delta'] })).status).toBe('ok')
+  const stored = (await createStore(adapter).read()).find(({ meta }) => meta.id === 'delta')
+  expect(stored?.meta.dependsOn).toEqual(['charlie', 'newest'])
+  const cascade = await zenlev.migrate.rollback({ id: 'newest', mode: 'cascade', dryRun: true })
+  expect(cascade.reversals).toEqual(['delta', 'newest'])
+})
+
+test('squashes all namespaces and bootstraps a clean ledger without replaying old code', async () => {
+  await stagedGraph()
+  const freshRaw = new Database(':memory:')
+  const partialRaw = new Database(':memory:')
+  const freshDb = new Kysely({ dialect: createBunSqliteDialect(freshRaw) })
+  const partialDb = new Kysely({ dialect: createBunSqliteDialect(partialRaw) })
+  const freshAdapter = createKyselyAdapter(freshDb, 'sqlite')
+  const fresh = await createZenlev({ cwd, adapter: freshAdapter, env: 'new' })
+  const partial = await createZenlev({
+    cwd,
+    adapter: createKyselyAdapter(partialDb, 'sqlite'),
+    env: 'partial',
+  })
+  try {
+    await expect(zenlev.migrate.squash({ dryRun: true })).rejects.toThrow('requires an applied')
+    expect(exists('zenlev_migrations')).toBe(false)
+    await partial.migrate.apply({ only: ['alpha'] })
+    await zenlev.migrate.apply()
+    await migration('vfirst', "throw new Error('old pending handler')")
+    await migration('vnext', 'void ctx', undefined, { supersedes: ['vfirst'] })
+    await expect(zenlev.migrate.squash({ dryRun: true })).rejects.toThrow(
+      'Apply pending migrations',
+    )
+    await zenlev.migrate.apply({ only: ['vnext'] })
+    raw.run('CREATE INDEX idx_accounts ON accounts(id)')
+    raw.run('CREATE VIEW account_view AS SELECT id FROM accounts')
+    raw.run('CREATE TRIGGER account_trigger AFTER INSERT ON accounts BEGIN SELECT new.id; END')
+    raw.run('CREATE TABLE _prisma_migrations (id INT)')
+    const preview = await zenlev.migrate.squash({ dryRun: true })
+    expect(preview.migration).toBeUndefined()
+    expect(preview.supersedes).toEqual([
+      'alpha',
+      'bravo',
+      'charlie',
+      'delta',
+      'echo',
+      'vfirst',
+      'vnext',
+    ])
+    expect(
+      preview.statements.map((statement) => statement.split(' ').slice(0, 2).join(' ')),
+    ).toEqual(['CREATE TABLE', 'CREATE TABLE', 'CREATE INDEX', 'CREATE VIEW', 'CREATE TRIGGER'])
+    const { migration: base } = await zenlev.migrate.squash({
+      name: 'baseline',
+      namespace: 'pre-deploy',
+      format: true,
+    })
+    const baselineId = base!.id
+    const blocked = await partial.migrate.apply({ only: [baselineId] })
+    expect(blocked.plan.blockers).toMatchObject([
+      { migrationId: baselineId, code: 'BASELINE_HISTORY' },
+    ])
+    expect(blocked.migrations).toEqual([])
+    expect((await zenlev.migrate.apply({ only: [baselineId] })).status).toBe('ok')
+    expect(raw.query('SELECT id FROM accounts ORDER BY id').values()).toEqual([[1], [2], [3]])
+    expect(await createStore(adapter).read()).toHaveLength(7)
+    await expect(zenlev.migrate.rollback({ id: 'bravo', mode: 'compensate' })).rejects.toThrow(
+      'require a forward migration',
+    )
+    await expect(zenlev.migrate.rollback({ id: baselineId, mode: 'cascade' })).rejects.toThrow(
+      'require a forward migration',
+    )
+
+    const archive = resolve(cwd, 'archive')
+    await mkdir(archive)
+    for (const id of preview.supersedes) {
+      await rename(resolve(cwd, 'migrations', id + '_' + id + '.ts'), resolve(archive, id + '.ts'))
+    }
+    await migration(
+      'followup',
+      "await ctx.db.schema.createTable('followup').addColumn('id','integer').execute()",
+      undefined,
+      {
+        namespace: 'post-deploy',
+        dependsOn: ['delta'],
+      },
+    )
+    const freshPlan = await fresh.migrate.apply({ namespace: ['post-deploy'], planOnly: true })
+    expect(freshPlan.plan.blockers[0]?.message).toContain(baselineId)
+    expect((await fresh.migrate.apply({ only: ['alpha'] })).migrations.map(({ id }) => id)).toEqual(
+      [baselineId],
+    )
+    expect(freshRaw.query('SELECT * FROM account_view').all()).toEqual([])
+    expect(
+      freshRaw.query("SELECT name FROM sqlite_schema WHERE type = 'trigger'").values(),
+    ).toEqual([['account_trigger']])
+    expect(await createStore(freshAdapter).read()).toHaveLength(1)
+
+    await zenlev.migrate.apply()
+    await fresh.migrate.apply()
+    const { migration: second } = await zenlev.migrate.squash({ name: 'baseline_again' })
+    expect((await zenlev.migrate.apply({ only: [second!.id] })).status).toBe('ok')
+    expect((await fresh.migrate.apply({ only: [second!.id] })).status).toBe('ok')
+    expect(await createStore(freshAdapter).read()).toHaveLength(3)
+    expect(await createStore(adapter).read()).toHaveLength(9)
+  } finally {
+    await fresh.close()
+    await partial.close()
+    await freshDb.destroy()
+    await partialDb.destroy()
+  }
+})
+
+test('validates reviewed baseline SQL and rejects automatic SQLite virtual table snapshots', async () => {
+  await migration('alpha', createAccounts)
+  await zenlev.migrate.apply()
+  const snapshot = resolve(cwd, 'snapshot.json')
+  await Bun.write(snapshot, '{}')
+  await expect(zenlev.migrate.squash({ snapshot: 'snapshot.json' })).rejects.toThrow('JSON array')
+  await Bun.write(snapshot, JSON.stringify([' ']))
+  await expect(zenlev.migrate.squash({ snapshot: 'snapshot.json' })).rejects.toThrow('nonempty SQL')
+  raw.run('CREATE VIRTUAL TABLE account_search USING fts5(id)')
+  await expect(zenlev.migrate.squash({ dryRun: true })).rejects.toThrow('virtual tables')
+  await Bun.write(snapshot, '[]')
+  const { migration: base } = await zenlev.migrate.squash({ snapshot: 'snapshot.json' })
+  expect(await Bun.file(base!.filePath).text()).toContain('void ctx')
 })
 
 test('rolls back the migration plan and ledger together when a handler throws', async () => {

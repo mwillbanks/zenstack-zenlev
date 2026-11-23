@@ -31,6 +31,7 @@ function harness(result: unknown = { status: 'ok' }) {
         'create',
         'apply',
         'rollback',
+        'squash',
         'status',
         'tree',
         'remove',
@@ -118,6 +119,35 @@ describe('CLI argument parsing', () => {
       },
     })
     expect(parseCli(['migrate', 'status']).config).toEqual({})
+  })
+
+  test('maps baseline preview and snapshot options', async () => {
+    const { calls, dependencies } = harness()
+    const args = [
+      'migrate',
+      'squash',
+      '--name',
+      'baseline',
+      '--namespace',
+      'pre-deploy',
+      '--snapshot',
+      'bootstrap.json',
+      '--format',
+      '--dry-run',
+    ]
+    expect(await runCli(args, dependencies)).toBe(0)
+    expect(calls).toEqual([
+      {
+        method: 'squash',
+        options: {
+          name: 'baseline',
+          namespace: 'pre-deploy',
+          snapshot: 'bootstrap.json',
+          format: true,
+          dryRun: true,
+        },
+      },
+    ])
   })
 
   test('handles command-dependent format and list flags', () => {

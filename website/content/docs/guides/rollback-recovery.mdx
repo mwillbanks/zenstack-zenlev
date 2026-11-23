@@ -3,6 +3,8 @@ title: 'Rollback and recovery'
 description: 'Record compensation and reconcile uncertain execution with evidence.'
 ---
 
+import { RollbackGraph } from '../../../src/components/history-diagrams'
+
 A deployed database keeps receiving data and serving multiple application versions. Reversing a change requires a decision about its dependents and subsequent writes.
 
 Zenlev records compensation as a new superseding migration. Recovery reconciles an execution whose database outcome needs operator inspection.
@@ -18,6 +20,8 @@ bun run zenlev migrate rollback --id <id> --compensate --format
 `--cascade` includes active transitive dependents in reverse dependency order. Use it when the target and its dependent changes must be reversed together.
 
 `--compensate` selects the target and warns about active dependents. Review how those dependents will continue to operate before choosing it.
+
+<RollbackGraph />
 
 Both modes generate a superseding migration for review. Generation leaves the database work for a later apply. Review its reversal set and apply that generated migration through the ordinary workflow.
 

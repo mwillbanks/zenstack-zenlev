@@ -1,5 +1,6 @@
 import type {
   ApplyOptions,
+  Dialect,
   MigrationIdentity,
   MigrationMeta,
   MigrationStatus,
@@ -104,10 +105,21 @@ export function buildGraph(
     records.set(record.meta.id, record)
   }
 
-  const ids = sorted([...definitions.keys(), ...records.keys()])
   const metadata = new Map(
-    ids.map((id) => [id, definitions.get(id) ?? records.get(id)!.meta] as const),
+    sorted([...definitions.keys(), ...records.keys()]).map(
+      (id) => [id, definitions.get(id) ?? records.get(id)!.meta] as const,
+    ),
   )
+  // A baseline can carry references whose files and ledger rows are absent in a fresh environment.
+  for (const meta of metadata.values()) {
+    if (!meta.baseline) continue
+    for (const id of meta.supersedes ?? []) {
+      if (!metadata.has(id)) {
+        metadata.set(id, { id, name: id, namespace: meta.namespace, createdAt: meta.createdAt })
+      }
+    }
+  }
+  const ids = sorted(metadata.keys())
   const direct = new Map<string, string>()
   for (const [id, meta] of metadata) {
     const references = [
@@ -137,6 +149,19 @@ export function buildGraph(
       path.add(replacement)
     }
     if (replacement !== id) replacements.set(id, replacement)
+  }
+
+  for (const [id, meta] of metadata) {
+    if (
+      meta.baseline &&
+      meta.supersedes?.some((old) => replacements.get(old) !== (replacements.get(id) ?? id))
+    ) {
+      throw new Error('A superseding migration cannot split baseline history: ' + id)
+    }
+    const replacement = replacements.get(id)
+    if (meta.baseline && replacement && !metadata.get(replacement)?.baseline) {
+      throw new Error('Only another baseline can supersede a baseline: ' + id)
+    }
   }
 
   const nodes = new Map<string, GraphNode>()
@@ -203,10 +228,49 @@ function hasUnresolvedAttempt(node: GraphNode): boolean {
   )
 }
 
+export function baselineMode(
+  graph: MigrationGraph,
+  migration: MigrationMeta,
+): 'bootstrap' | 'adopt' | 'incompatible' {
+  const records = [...graph.nodes.values()].flatMap(({ id, record }) =>
+    record && id !== migration.id ? [record] : [],
+  )
+  if (records.length === 0) return 'bootstrap'
+  const known = new Map(records.map((record) => [record.meta.id, record]))
+  const archived = new Set<string>()
+  for (const { id, expected } of migration.baseline!.history) {
+    const actual = known.get(id)
+    if (expected === null) {
+      if (actual) return 'incompatible'
+      continue
+    }
+    if (
+      !actual ||
+      actual.status !== expected.status ||
+      actual.hash !== expected.hash ||
+      actual.unresolvedAttempt
+    )
+      return 'incompatible'
+    known.delete(id)
+    if (actual.meta.baseline && actual.status === 'applied') {
+      for (const old of actual.meta.supersedes ?? []) archived.add(old)
+    }
+  }
+  return [...known.values()].every(
+    ({ meta, status, unresolvedAttempt }) =>
+      archived.has(meta.id) &&
+      !unresolvedAttempt &&
+      (status === 'applied' || status === 'rolled_back'),
+  )
+    ? 'adopt'
+    : 'incompatible'
+}
+
 export function planMigrations(
   graph: MigrationGraph,
   options: ApplyOptions = {},
   transactional: boolean = true,
+  dialect?: Dialect,
 ): Plan {
   if (transactional && options.continueOnFailure && !options.noTransaction) {
     throw new Error('--continue-on-failure requires --no-transaction on transactional dialects')
@@ -271,6 +335,15 @@ export function planMigrations(
         code: 'PENDING_PREREQUISITE',
         message: `Migration ${id} has no local executable definition`,
       })
+    }
+    if (node.meta.baseline) {
+      const message =
+        dialect && dialect !== node.meta.baseline.dialect
+          ? `Baseline ${id} was generated for ${node.meta.baseline.dialect}, not ${dialect}`
+          : baselineMode(graph, node.meta) === 'incompatible'
+            ? `Baseline ${id} requires an empty ledger or matching completed history`
+            : undefined
+      if (message) blockers.push({ migrationId: id, code: 'BASELINE_HISTORY', message })
     }
     for (const dependency of node.dependencies) {
       if (!isApplied(graph.nodes.get(dependency)!) && !candidateSet.has(dependency)) {

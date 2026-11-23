@@ -30,6 +30,18 @@ const missing = expected.filter((path) => !existsSync(join(root, path)))
 if (missing.length) throw new Error('Missing static output: ' + missing.join(', '))
 const html = readFileSync(join(root, 'index.html'), 'utf8')
 if (!html.includes('Migrations with')) throw new Error('Home page was not prerendered')
+for (const label of ['Preview ledger', 'Production ledger', 'Backfill v2', 'Supersedes']) {
+  if (!html.includes('>' + label + '<')) throw new Error('Missing homepage graph label: ' + label)
+}
+for (const [slug, labels] of [
+  ['graph', ['Original dependency', 'Effective dependency']],
+  ['rollback-recovery', ['Cascade Backfill rows', 'Compensate Backfill rows']],
+] as const) {
+  const guide = readFileSync(join(root, 'docs', 'guides', slug, 'index.html'), 'utf8')
+  for (const label of labels) {
+    if (!guide.includes('>' + label + '<')) throw new Error('Missing guide diagram label: ' + label)
+  }
+}
 const search = JSON.parse(readFileSync(join(root, 'api/search'), 'utf8'))
 if (search?.type !== 'advanced' || !Array.isArray(search.internalDocumentIDStore?.internalIdToId))
   throw new Error('Search index is invalid')

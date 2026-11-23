@@ -132,6 +132,36 @@ try {
   assert.equal(status.result.length, 2)
   assert(status.result.every((entry) => entry.status === 'applied'))
 
+  const squash = JSON.parse(
+    await run(
+      [process.execPath, 'run', '--silent', 'zenlev', 'migrate', 'squash', '--json'],
+      consumer,
+    ),
+  ) as { status: string; result: { migration: { id: string }; supersedes: string[] } }
+  assert.equal(squash.status, 'ok')
+  assert.equal(squash.result.supersedes.length, 2)
+  const baseline = JSON.parse(
+    await run(
+      [
+        process.execPath,
+        'run',
+        '--silent',
+        'zenstack-zenlev',
+        'migrate',
+        'apply',
+        '--only',
+        squash.result.migration.id,
+        '--json',
+      ],
+      consumer,
+    ),
+  ) as { status: string; result: { migrations: { id: string }[] } }
+  assert.equal(baseline.status, 'ok')
+  assert.deepEqual(
+    baseline.result.migrations.map(({ id }) => id),
+    [squash.result.migration.id],
+  )
+
   if (options.values.output !== undefined) {
     const output = resolve(options.values.output)
     await mkdir(output, { recursive: true })

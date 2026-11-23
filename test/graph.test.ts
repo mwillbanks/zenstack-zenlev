@@ -90,6 +90,29 @@ describe('effective dependency graph', () => {
     ).toThrow('Supersedes cycle')
   })
 
+  test('protects baseline history and checks the destination dialect', () => {
+    const root = migration('old')
+    const baseline = migration('base', {
+      supersedes: ['old'],
+      baseline: {
+        dialect: 'sqlite',
+        history: [{ id: 'old', expected: { status: 'applied', hash: root.hash } }],
+      },
+    })
+    const graph = buildGraph([baseline])
+    expect(resolveMigrationId(graph, 'old')).toBe('base')
+    expect(planMigrations(graph, {}, true, 'mysql').blockers).toMatchObject([
+      { migrationId: 'base', code: 'BASELINE_HISTORY', message: expect.stringContaining('sqlite') },
+    ])
+    const split = migration('other', {
+      supersedes: ['old'],
+      createdAt: '2026-11-21T01:00:00.000Z',
+    })
+    expect(() => buildGraph([baseline, split])).toThrow('cannot split baseline')
+    const replace = migration('other', { supersedes: ['base'] })
+    expect(() => buildGraph([baseline, replace])).toThrow('Only another baseline')
+  })
+
   test('rewrites replacements transitively without mutating stored history', () => {
     const a = migration('a')
     const b = migration('b', { supersedes: ['a'], dependsOn: ['a'] })

@@ -13,6 +13,7 @@ import type { Kysely } from 'kysely'
 import * as execution from './execution'
 import * as inspection from './inspection'
 import { rollback, type RollbackOptions, type RollbackResult } from './rollback'
+import { squash, type SquashOptions, type SquashResult } from './baseline'
 import { createDiffMigration, push, type PushOptions, type PushResult } from './schema-commands'
 import type { RecoveryOptions } from './store'
 import { loadProjectConfig, type ResolvedProjectConfig } from './project-config'
@@ -69,6 +70,7 @@ export interface Zenlev<Context extends object = any> {
     apply(options?: ApplyOptions): Promise<ApplyResult>
     create(options: inspection.CreateOptions): Promise<MigrationIdentity>
     rollback(options: RollbackOptions): Promise<RollbackResult>
+    squash(options?: SquashOptions): Promise<SquashResult>
     status(options?: inspection.StatusOptions): Promise<inspection.StatusEntry[]>
     tree(options?: inspection.TreeOptions): Promise<string>
     remove(options: inspection.RemoveOptions): Promise<MigrationIdentity[]>
@@ -206,6 +208,8 @@ export async function createZenlev<const Config extends ZenlevConfig = {}>(
         ),
       rollback: (options) =>
         dispatch('migrate rollback', options, (context) => rollback(context, options)),
+      squash: (options = {}) =>
+        dispatch('migrate squash', options, (context) => squash(context, options)),
       status: (options = {}) =>
         dispatch('migrate status', options, (context) => inspection.status(context, options)),
       tree: (options = {}) =>

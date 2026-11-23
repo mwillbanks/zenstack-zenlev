@@ -1,0 +1,49 @@
+---
+title: 'Squash migration history'
+description: 'Start future environments from one reviewed baseline while retaining existing ledger history.'
+---
+
+A new environment usually needs the current schema and a small set of seed rows. Replaying years of backfills and transitional schema can add time and depend on application code that no longer exists.
+
+`migrate squash` creates a single TypeScript baseline for the completed graph, across all namespaces. It records the IDs and ledger hashes it expects. Existing environments with matching history adopt the baseline without executing its bootstrap code. A new environment with an empty ledger executes that code once.
+
+| Destination                      | Apply behavior                                                                |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| Empty ledger on a clean database | Execute the baseline and record it                                            |
+| Matching completed history       | Record the baseline and retain existing rows and ledger history               |
+| Partial or different history     | Block apply until the destination catches up or the discrepancy is reconciled |
+
+## Create and review the baseline
+
+1. Bring the source environment up to date. Resolve pending work, file hash mismatches, and any unresolved attempts.
+2. Preview the baseline. Check the covered IDs and SQL.
+3. Generate the file. Include any essential seed data and test it on a disposable empty database. Keep application writers out of the source database while you acquire the snapshot.
+4. Deploy the same reviewed file to all existing environments. Apply it before moving the covered files out of the configured migrations directory.
+5. Archive the covered files through version control. Keep the old revision for audit and for environments that must catch up before adopting the baseline.
+
+```sh
+bun run zenlev migrate squash --env staging --dry-run
+bun run zenlev migrate squash --env staging --name baseline_2026 --namespace pre-deploy --format
+bun run zenlev migrate apply --env staging --only <baseline-id> --plan-only
+bun run zenlev migrate apply --env staging --only <baseline-id>
+bun run zenlev migrate apply --env new-environment --only <baseline-id>
+```
+
+The squash command writes the baseline file. The apply command records or executes it. Files stay where they are until you archive them. Existing ledger rows remain available for audit. The baseline carries historical IDs, so dependencies on archived IDs still work in new environments. Declare future work against the baseline ID and use a forward migration to revise changes inside it.
+
+## Choose the bootstrap contents
+
+By default, Zenlev snapshots SQLite's main schema. It includes tables, indexes, views, and triggers and excludes SQLite internals and Zenlev and Prisma bookkeeping. [SQLite schema table](https://www.sqlite.org/schematab.html)
+
+For PostgreSQL, MySQL, or SQLite databases with virtual tables, pass `--snapshot <path>` with reviewed SQL. The path resolves from the effective project directory. Supply a JSON array with one SQL statement per string, in execution order. You can also use this option for SQLite when your bootstrap requires custom DDL or seed data.
+
+```json
+[
+  "CREATE TABLE roles (id INTEGER PRIMARY KEY, name VARCHAR(64) NOT NULL)",
+  "INSERT INTO roles (id, name) VALUES (1, 'member')"
+]
+```
+
+Review the SQL for the target dialect and include any required database objects. Leave transaction commands and database client directives out of the snapshot. Zenlev manages the transaction or records a durable attempt for non-transactional DDL. The generated migration embeds the statements in its hashed entry file. Automatic SQLite snapshots cover schema only. Review which reference data belongs in bootstrap code. Existing deployments keep their data. Use a separate data export for restoring application records.
+
+A squash starts at the current database shape. Deployment checkpoints from the old graph stay in historical records. Keep separate migration files for changes that must still run at different points in a live deployment.

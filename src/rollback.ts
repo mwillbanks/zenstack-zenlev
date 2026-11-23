@@ -52,6 +52,18 @@ export function activeDependentIds(graph: MigrationGraph, target: string): strin
   return result
 }
 
+export function assertReversibleHistory(graph: MigrationGraph, target: string): void {
+  const archived = [...graph.nodes.values()].some(
+    ({ record }) =>
+      record?.status === 'applied' &&
+      record.meta.baseline &&
+      record.meta.supersedes?.includes(target),
+  )
+  if (graph.nodes.get(target)?.meta.baseline || archived) {
+    throw new Error('A baseline and its archived history require a forward migration')
+  }
+}
+
 export async function verifyReversals(
   graph: MigrationGraph,
   local: ReadonlyMap<string, LoadedMigration>,
@@ -91,6 +103,7 @@ export async function rollback(
     if (active?.record?.status !== 'applied') {
       throw new Error('Target migration must be actively applied: ' + options.id)
     }
+    assertReversibleHistory(graph, options.id)
     const dependents = activeDependentIds(graph, options.id)
     const reversals = [...(options.mode === 'cascade' ? dependents : []), options.id]
     await verifyReversals(

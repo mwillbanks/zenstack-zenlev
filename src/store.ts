@@ -202,7 +202,8 @@ export function createStore(
     await sql`CREATE TABLE IF NOT EXISTS ${names.lock.identifier} (lock_id VARCHAR(64) PRIMARY KEY, owner VARCHAR(191), acquired_at TEXT, version INTEGER NOT NULL)`.execute(
       root.physical,
     )
-    await sql`CREATE TABLE IF NOT EXISTS ${names.migrations.identifier} (id VARCHAR(191) PRIMARY KEY, meta TEXT NOT NULL, hash VARCHAR(128) NOT NULL, status VARCHAR(20) NOT NULL, attempt_id VARCHAR(191), unresolved INTEGER NOT NULL, applied_at TEXT, rolled_back_at TEXT, duration_ms INTEGER NOT NULL DEFAULT 0)`.execute(
+    const metaType = adapter.dialect === 'mysql' ? sql`LONGTEXT` : sql`TEXT`
+    await sql`CREATE TABLE IF NOT EXISTS ${names.migrations.identifier} (id VARCHAR(191) PRIMARY KEY, meta ${metaType} NOT NULL, hash VARCHAR(128) NOT NULL, status VARCHAR(20) NOT NULL, attempt_id VARCHAR(191), unresolved INTEGER NOT NULL, applied_at TEXT, rolled_back_at TEXT, duration_ms INTEGER NOT NULL DEFAULT 0)`.execute(
       root.physical,
     )
     await sql`CREATE TABLE IF NOT EXISTS ${names.resolutions.identifier} (migration_id VARCHAR(191) NOT NULL, hash VARCHAR(128) NOT NULL, accepted_at TEXT NOT NULL, actor TEXT NOT NULL, reason TEXT, PRIMARY KEY (migration_id, hash))`.execute(
@@ -320,6 +321,28 @@ export function createStore(
     }
     await release()
     return value
+  }
+
+  async function accommodateBaseline(owner: string, migration: MigrationIdentity): Promise<void> {
+    if (
+      adapter.dialect !== 'mysql' ||
+      Buffer.byteLength(JSON.stringify(metadata(migration))) <= 65_535
+    ) {
+      return
+    }
+    await assertOwner(root, owner)
+    const { name, namespace } = names.migrations
+    const schema = namespace ?? sql`DATABASE()`
+    const { rows } = await sql<{ column_type: string }>`
+      SELECT DATA_TYPE AS column_type FROM information_schema.columns
+      WHERE table_schema = ${schema} AND table_name = ${name} AND column_name = 'meta'
+    `.execute(root.physical)
+    if (rows[0]?.column_type !== 'longtext') {
+      // Legacy MySQL stores use TEXT. Widen it outside the migration transaction.
+      await sql`ALTER TABLE ${names.migrations.identifier} MODIFY COLUMN meta LONGTEXT NOT NULL`.execute(
+        root.physical,
+      )
+    }
   }
 
   async function start(
@@ -493,6 +516,7 @@ export function createStore(
     lockInfo,
     withLock,
     assertOwner,
+    accommodateBaseline,
     start: (
       session: DatabaseSession,
       owner: string,

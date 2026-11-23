@@ -31,6 +31,7 @@ export interface AuthorMigrationInput {
   readonly tags?: readonly string[]
   readonly custom?: Readonly<Record<string, unknown>>
   readonly rollback?: MigrationMeta['rollback']
+  readonly baseline?: MigrationMeta['baseline']
   readonly warnings?: readonly Warning[]
   readonly upBody?: string
   readonly downBody?: string
@@ -124,6 +125,11 @@ function validateMeta(value: unknown): asserts value is MigrationMeta {
       throw new TypeError('Migration warnings must contain supported codes and nonempty messages')
     }
   }
+  if (value.baseline !== undefined && !validBaseline(value)) {
+    throw new TypeError(
+      'Migration baseline requires a dialect, covered history, and no dependencies or rollback',
+    )
+  }
   if (value.rollback !== undefined) {
     const rollback = value.rollback
     if (!record(rollback) || !['cascade', 'compensate'].includes(String(rollback.mode))) {
@@ -135,6 +141,35 @@ function validateMeta(value: unknown): asserts value is MigrationMeta {
       throw new TypeError('Migration rollback reversals must include its target')
     }
   }
+}
+
+function validBaseline(meta: Record<string, unknown>): boolean {
+  const { baseline, supersedes, dependsOn, rollback } = meta
+  if (
+    !record(baseline) ||
+    !['sqlite', 'postgresql', 'mysql'].includes(String(baseline.dialect)) ||
+    !Array.isArray(supersedes) ||
+    rollback !== undefined ||
+    (Array.isArray(dependsOn) && dependsOn.length > 0) ||
+    !Array.isArray(baseline.history)
+  )
+    return false
+  const covered = new Set(supersedes)
+  let applied = false
+  for (const entry of baseline.history) {
+    if (!record(entry) || !covered.delete(entry.id)) return false
+    const expected = entry.expected
+    if (expected === null) continue
+    if (
+      !record(expected) ||
+      (expected.status !== 'applied' && expected.status !== 'rolled_back') ||
+      typeof expected.hash !== 'string' ||
+      !/^(?:[a-f0-9]{32}|[a-f0-9]{40}|[a-f0-9]{64}|[a-f0-9]{128})$/.test(expected.hash)
+    )
+      return false
+    applied ||= expected.status === 'applied'
+  }
+  return applied
 }
 
 export function hashMigrationContent(
@@ -182,6 +217,18 @@ function snapshotMeta(meta: MigrationMeta): MigrationMeta {
     tags: Object.freeze([...(meta.tags ?? [])]),
     custom: Object.freeze({ ...meta.custom }),
     warnings: Object.freeze([...(meta.warnings ?? [])]),
+    ...(meta.baseline
+      ? {
+          baseline: Object.freeze({
+            dialect: meta.baseline.dialect,
+            history: Object.freeze(
+              meta.baseline.history.map(({ id, expected }) =>
+                Object.freeze({ id, expected: expected && Object.freeze({ ...expected }) }),
+              ),
+            ),
+          }),
+        }
+      : {}),
   })
 }
 
@@ -309,6 +356,7 @@ export async function authorMigration(
     tags: input.tags ?? [],
     custom: input.custom ?? {},
     ...(input.rollback === undefined ? {} : { rollback: input.rollback }),
+    ...(input.baseline === undefined ? {} : { baseline: input.baseline }),
     ...(input.warnings === undefined ? {} : { warnings: input.warnings }),
   }
   validateMeta(meta)

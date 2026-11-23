@@ -40,6 +40,14 @@ export interface DatabaseAdapter<Client = unknown, DB = any, TxClient = Client> 
   transaction<T>(run: (session: DatabaseSession<TxClient, DB>) => Promise<T>): Promise<T>
 }
 
+export interface BaselineManifest {
+  readonly dialect: Dialect
+  readonly history: readonly {
+    readonly id: string
+    readonly expected: { readonly status: 'applied' | 'rolled_back'; readonly hash: string } | null
+  }[]
+}
+
 export interface MigrationMeta {
   readonly id: string
   readonly name: string
@@ -50,6 +58,7 @@ export interface MigrationMeta {
   readonly tags?: readonly string[]
   readonly custom?: Attributes
   readonly warnings?: readonly Warning[]
+  readonly baseline?: BaselineManifest
   readonly rollback?: {
     readonly mode: 'cascade' | 'compensate'
     readonly target: string
@@ -174,7 +183,8 @@ export interface Plan {
 
 export interface PlanBlocker {
   readonly migrationId: string
-  readonly code: 'PENDING_PREREQUISITE' | 'HASH_MISMATCH' | 'UNRESOLVED_ATTEMPT'
+  readonly code:
+    'PENDING_PREREQUISITE' | 'HASH_MISMATCH' | 'UNRESOLVED_ATTEMPT' | 'BASELINE_HISTORY'
   readonly message: string
 }
 
