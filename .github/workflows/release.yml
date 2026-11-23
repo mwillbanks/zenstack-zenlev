@@ -113,11 +113,18 @@ jobs:
             const entries=readFileSync('CHANGELOG.md','utf8').split(/\r?\n/);
             if(!entries.some(line=>line===`## [${manifest.version}]` || line.startsWith(`## [${manifest.version}] - `))) throw Error('Missing authored changelog entry');
             if(!existsSync(`website/content/docs/releases/${manifest.version}.mdx`)) throw Error('Missing authored documentation release notes');
+      - name: Validate package skills
+        run: |
+          if node -e 'process.exit(require("./package.json").scripts["skills:check"] ? 0 : 1)'; then
+            bun run skills:check
+          fi
       - run: bun run verify:coverage
       - run: bun run build
       - run: bun run pack:check --output release-artifacts
       - name: Check registry integrity
         id: archive
+        env:
+          QUALIFIED_TAG: ${{ env.RELEASE_TAG }}
         uses: actions/github-script@v9.0.0
         with:
           script: |
@@ -128,14 +135,19 @@ jobs:
             if(files.length!==1) throw Error('Expected exactly one qualified tarball');
             const path='release-artifacts/'+files[0];
             const integrity='sha512-'+createHash('sha512').update(fs.readFileSync(path)).digest('base64');
-            const response=await fetch('https://registry.npmjs.org/'+encodeURIComponent(manifest.name)+'/'+manifest.version);
-            if(!response.ok && response.status!==404) throw Error('Registry lookup failed: '+response.status);
-            if(response.ok) {
-              const {dist}=await response.json();
-              if(dist?.integrity!==integrity) throw Error('Published version differs from archive');
-              if(!dist.attestations?.url) throw Error('Published version lacks npm attestations');
+            // Untagged dry runs qualify unreleased code that can still carry the latest published version.
+            let publish=false;
+            if(process.env.QUALIFIED_TAG) {
+              const response=await fetch('https://registry.npmjs.org/'+encodeURIComponent(manifest.name)+'/'+manifest.version);
+              if(!response.ok && response.status!==404) throw Error('Registry lookup failed: '+response.status);
+              if(response.ok) {
+                const {dist}=await response.json();
+                if(dist?.integrity!==integrity) throw Error('Published version differs from archive');
+                if(!dist.attestations?.url) throw Error('Published version lacks npm attestations');
+              }
+              publish=response.status===404;
             }
-            core.setOutput('publish',String(response.status===404));
+            core.setOutput('publish',String(publish));
             core.setOutput('path',files[0]);
             core.setOutput('integrity',integrity);
             core.setOutput('tag',manifest.version.includes('-')?'next':'latest');

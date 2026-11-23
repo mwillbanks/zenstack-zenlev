@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "bun@1.4.4",
   "scripts": {
-    "build": "bun --bun vite build",
+    "build": "bun --bun vite build && bun scripts/generate-discovery.ts",
     "generate": "bun --bun fumadocs-mdx && bun scripts/generate-routes.ts",
     "typecheck": "bun run generate && bun check",
     "lint": "bun fmt --check .",

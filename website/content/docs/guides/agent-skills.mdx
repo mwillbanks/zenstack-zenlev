@@ -1,0 +1,136 @@
+---
+title: Agent skills
+description: Load task-focused Zenlev guidance from your installed package with TanStack Intent, explicit permissions, and version review.
+---
+
+Zenlev ships five Agent Skills with its npm package. Each skill explains a specific migration task and its decision points. TanStack Intent discovers that guidance from your installed dependency, so the instructions travel with the library version you use.
+
+Skills help an agent reason about the graph and database state. They do not grant permission to run migrations or replace your deployment controls.
+
+## Install the pinned Intent CLI
+
+Zenlev requires Bun for its CLI and migrations. Intent also supports npm-based tooling. Install Zenlev and the pinned Intent development dependency using your project's package manager.
+
+With Bun:
+
+```sh
+bun add @mwillbanks/zenstack-zenlev
+bun add --dev --exact @tanstack/intent@0.5.6
+```
+
+With npm:
+
+```sh
+npm install @mwillbanks/zenstack-zenlev
+npm install --save-dev --save-exact @tanstack/intent@0.5.6
+```
+
+Commit the resulting lockfile. The commands below invoke the installed CLI. Avoid replacing them with an unpinned `@latest` runner during automated work.
+
+## Allow specific skills
+
+Merge this policy into your project's `package.json` before discovery. Exact identities permit only these named skills; they do not permit other dependencies or skills added later.
+
+```json
+{
+  "intent": {
+    "skills": [
+      "@mwillbanks/zenstack-zenlev#zenlev-setup",
+      "@mwillbanks/zenstack-zenlev#zenlev-migration-authoring",
+      "@mwillbanks/zenstack-zenlev#zenlev-deployment-planning",
+      "@mwillbanks/zenstack-zenlev#zenlev-schema-diff",
+      "@mwillbanks/zenstack-zenlev#zenlev-recovery"
+    ]
+  }
+}
+```
+
+| Skill                        | Load it for                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| `zenlev-setup`               | Client ownership, environment factories, standalone Kysely, and dialect setup. |
+| `zenlev-migration-authoring` | Metadata, dependencies, hashes, transaction scope, and reversible changes.     |
+| `zenlev-deployment-planning` | Namespace stages, cross-stage blockers, filters, and supersedes.               |
+| `zenlev-schema-diff`         | Comparison direction, SQL review, and missing-table decisions.                 |
+| `zenlev-recovery`            | Cascade, compensation, abandoned locks, interrupted attempts, and baselines.   |
+
+An exclusion overrides an allowlist entry. For example, this project permits deployment planning but withholds recovery guidance:
+
+```json
+{
+  "intent": {
+    "skills": [
+      "@mwillbanks/zenstack-zenlev#zenlev-deployment-planning",
+      "@mwillbanks/zenstack-zenlev#zenlev-recovery"
+    ],
+    "exclude": ["@mwillbanks/zenstack-zenlev#zenlev-recovery"]
+  }
+}
+```
+
+With that policy, loading recovery must fail. Configure an explicit allowlist: Intent 0.5.6 can surface discovered skills when no effective allowlist exists.
+
+## Discover, then load one task
+
+Run from the consumer project's root. List the permitted skills, then load the exact identity relevant to the current task.
+
+With Bun:
+
+```sh
+bun run intent list
+bun run intent load '@mwillbanks/zenstack-zenlev#zenlev-deployment-planning'
+```
+
+With npm:
+
+```sh
+npx --no-install intent list
+npx --no-install intent load '@mwillbanks/zenstack-zenlev#zenlev-deployment-planning'
+```
+
+For example, ask your agent to inspect a pre-deploy → deploy → post-deploy graph. Load deployment planning first. The agent should preview each namespace and report an excluded pending prerequisite as a blocker. Load migration authoring only if the task also requires new migration code.
+
+A successful load returns guidance. It does not prove that the agent selected the right skill or followed it. Verify the proposed commands, plan, and database evidence.
+
+## Add agent discovery guidance
+
+After setting the allowlist, preview Intent's project guidance and then install it:
+
+```sh
+bun run intent install --dry-run
+bun run intent install
+```
+
+For npm, use `npx --no-install intent install --dry-run` and then `npx --no-install intent install`. Intent updates a managed block in a supported agent guidance file. Inspect that diff before committing it. `install --map` can write explicit task-to-skill mappings instead.
+
+Intent's generated guidance can use an `@latest` runner. Review generated commands and retain the installed, lockfile-pinned invocation for reproducible use. Editor hooks are optional convenience for delivering guidance; they are not a security boundary or proof of correct agent behavior.
+
+## Review the installed version
+
+The package contains `skills/<name>/SKILL.md`. Staging records the package version in each skill's `metadata.library_version`. Inspect the loaded content and installed package version together:
+
+```sh
+bun run intent load '@mwillbanks/zenstack-zenlev#zenlev-setup' --json
+bun pm ls
+```
+
+Exact skill permissions freeze names, not instructions. Updating Zenlev can change an already allowed skill. Review dependency and lockfile changes, then compare the selected installed skill before relying on it. Intent does not currently record approval of specific instruction bytes or notify you about content changes.
+
+Zenlev's own CI checks declared source fingerprints and requires a recorded maintainer review when those sources change. That check protects package maintenance; consumers still decide whether to trust and apply the selected guidance.
+
+## Understand the trust boundary
+
+Intent scans installed package files without importing dependency entry points, running their binaries, or invoking lifecycle scripts. Discovering a transitive dependency does not grant it permission: every source needs its own matching allowlist entry.
+
+Yarn Plug'n'Play is the documented exception: Intent loads the project's `.pnp.cjs` runtime to locate packages. It still does not execute discovered package entry points or lifecycle scripts. Consider that project runtime when reviewing your execution environment.
+
+Static discovery does not make skill instructions inherently trustworthy. Review the permitted content and preserve project authorization rules. Loading recovery guidance does not authorize releasing a lock or marking an interrupted attempt applied.
+
+Read [Intent's trust model](https://tanstack.com/intent/latest/docs/concepts/trust-model) and [installation behavior](https://tanstack.com/intent/latest/docs/cli/intent-install) for policy and delivery details.
+
+## Continue with the task
+
+- [Configure the client and environment](./reference/configuration).
+- [Plan deployment stages](./guides/deployments).
+- [Understand namespace selection](./guides/namespaces).
+- [Review schema changes](./guides/schema-changes).
+- [Recover a rollout](./guides/rollback-recovery).

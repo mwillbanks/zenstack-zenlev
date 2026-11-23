@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "quick-start",
+    "agent-skills",
     "deployments",
     "namespaces",
     "migrations",

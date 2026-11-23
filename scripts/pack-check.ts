@@ -5,6 +5,17 @@ import { basename, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
 const root = resolve(import.meta.dir, '..')
+const skillNames = [
+  'zenlev-deployment-planning',
+  'zenlev-migration-authoring',
+  'zenlev-recovery',
+  'zenlev-schema-diff',
+  'zenlev-setup',
+]
+const intentCli = resolve(root, 'node_modules/@tanstack/intent/dist/cli.mjs')
+type SkillCatalog = {
+  skills: { use: string; packageName: string; packageVersion: string; skillName: string }[]
+}
 const options = parseArgs({
   args: process.argv.slice(2),
   options: { output: { type: 'string' } },
@@ -21,13 +32,17 @@ assert(
   'Run bun run build before pack:check',
 )
 
-async function run(command: string[], cwd: string): Promise<string> {
+async function run(command: string[], cwd: string, expectFailure = false): Promise<string> {
   const child = Bun.spawn(command, { cwd, stdout: 'pipe', stderr: 'pipe' })
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ])
+  if (expectFailure) {
+    assert.notEqual(exitCode, 0, command.join(' ') + ' must refuse unauthorized guidance')
+    return (stdout + stderr).trim()
+  }
   if (exitCode !== 0) {
     throw new Error(command.join(' ') + ' failed in packed consumer\n' + stdout + stderr)
   }
@@ -49,12 +64,45 @@ try {
     'dist/cli.js',
     'README.md',
     'LICENSE',
+    ...skillNames.map((name) => 'skills/' + name + '/SKILL.md'),
   ]) {
     assert(published.has(required), 'Missing package entry ' + required)
   }
   for (const path of published) {
     assert(!/^(?:src|test|website|node_modules)\//.test(path), 'Unexpected package content ' + path)
   }
+
+  assert.deepEqual(
+    [...published].filter((path) => path.startsWith('skills/')).sort(),
+    skillNames.map((name) => 'skills/' + name + '/SKILL.md'),
+  )
+  const untrustedName = 'zenlev-untrusted-fixture'
+  const untrusted = resolve(temporary, untrustedName)
+  await mkdir(untrusted)
+  await Bun.write(
+    resolve(untrusted, 'package.json'),
+    JSON.stringify({
+      name: untrustedName,
+      version: '1.0.0',
+      type: 'module',
+      main: './index.js',
+      keywords: ['tanstack-intent'],
+      repository: 'https://github.com/mwillbanks/zenstack-zenlev.git',
+      scripts: {
+        preinstall: 'bun ./index.js',
+        install: 'bun ./index.js',
+        postinstall: 'bun ./index.js',
+      },
+    }),
+  )
+  await Bun.write(
+    resolve(untrusted, 'index.js'),
+    "import { writeFileSync } from 'node:fs'\nwriteFileSync(new URL('./executed', import.meta.url), 'unsafe')\nthrow new Error('Dependency code must never execute')\n",
+  )
+  await Bun.write(
+    resolve(untrusted, 'skills/untrusted/SKILL.md'),
+    '---\nname: untrusted\ndescription: Unlisted fixture guidance that must remain unavailable.\n---\nDo not load this fixture.\n',
+  )
 
   const consumer = resolve(temporary, 'consumer')
   await mkdir(consumer)
@@ -65,7 +113,9 @@ try {
       name: 'zenlev-packed-consumer',
       private: true,
       type: 'module',
+      intent: { skills: skillNames.map((name) => manifest.name + '#' + name) },
       dependencies: {
+        [untrustedName]: 'file:' + untrusted,
         [manifest.name]: 'file:' + archivePath,
         '@zenstackhq/orm': manifest.devDependencies['@zenstackhq/orm'],
         kysely: manifest.devDependencies.kysely,
@@ -105,6 +155,78 @@ try {
     await Bun.write(resolve(consumer, path), content)
   }
   await run([process.execPath, 'install', '--ignore-scripts'], consumer)
+  const intent = (...args: string[]) => [process.execPath, intentCli, ...args]
+  const catalog = JSON.parse(await run(intent('list', '--json'), consumer)) as SkillCatalog
+  assert.deepEqual(catalog.skills.map((skill) => skill.skillName).sort(), skillNames)
+  for (const skill of catalog.skills) {
+    assert.equal(skill.packageName, manifest.name)
+    assert.equal(skill.packageVersion, manifest.version)
+    assert.equal(skill.use, manifest.name + '#' + skill.skillName)
+    const relative = 'skills/' + skill.skillName + '/SKILL.md'
+    const content = await Bun.file(
+      resolve(consumer, 'node_modules', manifest.name, relative),
+    ).text()
+    assert.equal(content, await Bun.file(resolve(root, relative)).text())
+    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content)
+    assert(frontmatter, relative + ' must contain frontmatter')
+    const metadata = Bun.YAML.parse(frontmatter[1]!) as {
+      name: string
+      metadata: { library_version: string }
+    }
+    assert.equal(metadata.name, skill.skillName)
+    assert.equal(metadata.metadata.library_version, manifest.version)
+  }
+  const identifier = manifest.name + '#zenlev-deployment-planning'
+  const loaded = JSON.parse(await run(intent('load', identifier, '--json'), consumer)) as {
+    package: string
+    skill: string
+    version: string
+    content: string
+  }
+  assert.equal(loaded.package, manifest.name)
+  assert.equal(loaded.skill, 'zenlev-deployment-planning')
+  assert.equal(loaded.version, manifest.version)
+  assert.equal(
+    loaded.content,
+    await Bun.file(
+      resolve(
+        consumer,
+        'node_modules',
+        manifest.name,
+        'skills/zenlev-deployment-planning/SKILL.md',
+      ),
+    ).text(),
+  )
+  const consumerManifest = await Bun.file(resolve(consumer, 'package.json')).json()
+  const fixtureIdentifier = untrustedName + '#untrusted'
+  consumerManifest.intent.skills.push(fixtureIdentifier)
+  await Bun.write(resolve(consumer, 'package.json'), JSON.stringify(consumerManifest))
+  const fixtureCatalog = JSON.parse(await run(intent('list', '--json'), consumer)) as SkillCatalog
+  assert(
+    fixtureCatalog.skills.some((skill) => skill.use === fixtureIdentifier),
+    'The fixture must be discoverable before testing its allowlist denial',
+  )
+  consumerManifest.intent.skills = consumerManifest.intent.skills.filter(
+    (identifier: string) => identifier !== fixtureIdentifier,
+  )
+  await Bun.write(resolve(consumer, 'package.json'), JSON.stringify(consumerManifest))
+  await run(intent('load', fixtureIdentifier, '--json'), consumer, true)
+  const excluded = manifest.name + '#zenlev-recovery'
+  consumerManifest.intent.exclude = [excluded]
+  await Bun.write(resolve(consumer, 'package.json'), JSON.stringify(consumerManifest))
+  const filtered = JSON.parse(await run(intent('list', '--json'), consumer)) as SkillCatalog
+  assert.deepEqual(
+    filtered.skills.map((skill) => skill.skillName).sort(),
+    skillNames.filter((name) => name !== 'zenlev-recovery'),
+  )
+  await run(intent('load', excluded, '--json'), consumer, true)
+  for (const fixtureRoot of [untrusted, resolve(consumer, 'node_modules', untrustedName)]) {
+    assert.equal(
+      await Bun.file(resolve(fixtureRoot, 'executed')).exists(),
+      false,
+      'Discovery and installation must not execute dependency code',
+    )
+  }
   await run([process.execPath, 'check', '--no-script'], consumer)
   await run([process.execPath, 'consumer.ts'], consumer)
 
@@ -168,7 +290,7 @@ try {
     await copyFile(archivePath, resolve(output, archive.filename))
   }
   console.log(
-    'Packed package passed typed API, SQLite migration, configuration, and both CLI aliases',
+    'Packed package passed versioned skills, static trust controls, typed API, SQLite, and both aliases',
   )
 } finally {
   await rm(temporary, { recursive: true, force: true })
