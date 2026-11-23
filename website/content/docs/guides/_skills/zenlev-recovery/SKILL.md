@@ -10,9 +10,9 @@ metadata:
     website/content/docs/guides/rollback-recovery.mdx
     website/content/docs/guides/baseline.mdx
     website/content/docs/reference/commands.mdx
-    src/rollback.ts
-    src/store.ts
-    src/baseline.ts
+    src/migrate/rollback.ts
+    src/migrate/store.ts
+    src/migrate/baseline.ts
 ---
 
 # Recover from observed database and ledger state

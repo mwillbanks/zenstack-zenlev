@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, setSystemTime, spyOn, te
 import * as readline from 'node:readline/promises'
 import * as tuil from '@mwillbanks/tuil'
 import { parseCli, runCli, type CliDependencies } from '../src/cli'
-import { renderTerminal } from '../src/cli-render'
+import { renderTerminal } from '../src/cli/render'
 import type { Zenlev } from '../src/engine'
 
 beforeEach(() => {

@@ -9,6 +9,7 @@
     "migrations",
     "graph",
     "schema-changes",
+    "linting",
     "rollback-recovery",
     "baseline",
     "adoption"

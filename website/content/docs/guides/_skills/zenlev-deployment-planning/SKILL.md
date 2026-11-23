@@ -10,8 +10,8 @@ metadata:
     website/content/docs/guides/deployments.mdx
     website/content/docs/guides/namespaces.mdx
     website/content/docs/guides/graph.mdx
-    src/graph.ts
-    src/execution.ts
+    src/migrate/graph.ts
+    src/migrate/execution.ts
 ---
 
 # Plan stages through dependencies

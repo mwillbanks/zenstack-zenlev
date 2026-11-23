@@ -63,7 +63,15 @@
     "@opentelemetry/sdk-trace": "3.1.1",
     "@paralleldrive/cuid2": "3.3.0",
     "@zenstackhq/language": "3.10.3",
-    "react": "19.3.1"
+    "ajv": "8.17.1",
+    "dt-sql-parser": "4.6.1",
+    "libpg-query": "18.2.5",
+    "pluralize": "8.0.0",
+    "react": "19.3.1",
+    "typescript-ast": "npm:typescript@5.9.3"
+  },
+  "optionalDependencies": {
+    "sqlite3-parser": "0.7.1"
   },
   "peerDependencies": {
     "@zenstackhq/orm": ">=3.10.0 <4",
@@ -78,7 +86,9 @@
     "@tanstack/intent": "0.5.6",
     "@types/bun": "1.4.5",
     "@types/pg": "8.23.1",
+    "@types/pluralize": "0.0.33",
     "@zenstackhq/orm": "3.10.3",
+    "@zenstackhq/plugin-policy": "3.10.3",
     "@zenstackhq/schema": "3.10.3",
     "kysely": "0.29.9",
     "mysql2": "3.24.6",

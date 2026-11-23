@@ -11,7 +11,7 @@ metadata:
     website/content/docs/reference/api.mdx
     website/content/docs/guides/namespaces.mdx
     src/database.ts
-    src/project-config.ts
+    src/config.ts
     src/types.ts
 ---
 

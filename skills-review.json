@@ -1,10 +1,10 @@
 {
   "zenlev-deployment-planning": {
-    "reason": "Checked effective prerequisites, plan filters, CLI JSON and the bundled inspector. A blind rollout assessment withheld contract while the effective prerequisite was pending.",
+    "reason": "Reviewed locked plan validation and write veto ordering. Dry runs and plan-only output remain independent of write hooks. Reviewed updated source paths after grouping modules by responsibility.",
     "files": {
-      "src/execution.ts": "4db87178cd26c823513a5481c055bf887a097ccd9dd5acfbc55fd887f00c2814",
-      "src/graph.ts": "2cacd37ba4688419095b823cc3417aa89ff67341921b28e9752c202861a98748",
-      "website/content/docs/guides/_skills/zenlev-deployment-planning/SKILL.md": "bd65cc4f56adc2392f2181932756aad8cf8bc3042634dc6d95995685afbd0cf1",
+      "src/migrate/execution.ts": "df74a7592173384d1a961ecb5dc4c60f7a9b0defde76c1022928d70d621ce8cb",
+      "src/migrate/graph.ts": "e9f7c68b19b3bd2f3cc365687467eb6b21b6fe2960b8aab4f4a1584ae5ec7be8",
+      "website/content/docs/guides/_skills/zenlev-deployment-planning/SKILL.md": "267fabcf688e1399463879c2790bcd55e5ee66be1fff42a0fdb64b7966246729",
       "website/content/docs/guides/_skills/zenlev-deployment-planning/scripts/check-plan.ts": "c46c830788f69c8ab2f0fab2d385501ae7d29fc006a7b72db85a4a58ef4e7e4a",
       "website/content/docs/guides/deployments.mdx": "472201d40e0baef7fab2ea6a5d9f4fc0da0a8af54420cbc0946a568db1260a30",
       "website/content/docs/guides/graph.mdx": "a2883b85ec9b1982a64e67ad3d016a3dd56678600d119339450cbc03c4730884",
@@ -12,63 +12,73 @@
     }
   },
   "zenlev-migration-authoring": {
-    "reason": "Checked explicit dependency metadata, hashes, and the transaction boundary. A blind authoring assessment preserved applied bytes and tested the proposed backfill against both histories.",
+    "reason": "Reviewed offline lint, AST evidence, migration file integrity, and the apply guard before handler execution. Reviewed updated source paths after grouping modules by responsibility.",
     "files": {
       "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
-      "src/execution.ts": "4db87178cd26c823513a5481c055bf887a097ccd9dd5acfbc55fd887f00c2814",
-      "src/migrations.ts": "8250312e60504f3733c69dcc8cc142d0881ed7fdae18d0fc42e2baa6b729b583",
-      "src/types.ts": "9d71d92cca286c8f4d8b1150a785fae80b0cdf91d061d0d398082b837c7e9c33",
-      "website/content/docs/guides/_skills/zenlev-migration-authoring/SKILL.md": "8de70522ddfd4627be14a25c38dcdc99f52379dcc8a2f18d4831b0018ddc7ad1",
+      "src/lint/project.ts": "f74bbd9755114932e7ad19a7e731907c77970658e9652d88c09138a77376caa8",
+      "src/lint/source/migration.ts": "7232956826a6445dbf0dd951c8dc7c24b05b92ec4cbd438f477ff591f1d06cc5",
+      "src/lint/zmodel.ts": "cbd197ba0234599f2f83af591b70b583bbb4cdc88e005c22b0281585d1370931",
+      "src/migrate/execution.ts": "df74a7592173384d1a961ecb5dc4c60f7a9b0defde76c1022928d70d621ce8cb",
+      "src/migrate/files.ts": "02eb7ce82e97b2f81c322e375c90219dc894b63315636068da763afedfb1bfa3",
+      "src/types.ts": "6d587e0c20c9bc05a8f5b60f06811e23fd4d5ea37ee6c8ea28a50d08215b7e18",
+      "website/content/docs/guides/_skills/zenlev-migration-authoring/SKILL.md": "ff5377522b61026db4d31e452f775302536ae34316759c6029b369fdb660b0bd",
+      "website/content/docs/guides/linting.mdx": "aeb5d0bbe3d8972261365c2c1af473049280491b4662d9fddbd010517bd22825",
       "website/content/docs/guides/migrations.mdx": "f28c99f690d20c725366ed73312b211d44c43fc05cb127b5bf114d36fbd85a53",
-      "website/content/docs/reference/commands.mdx": "0cb2261114b9178ac76599db80b33f3ba5367e7dc94306aedf3c222e0773f516"
+      "website/content/docs/reference/commands.mdx": "43f6fd2566ed74b41778c7774591aa1216e60926dadbe5ab77fb3acf66ad485b",
+      "website/content/docs/reference/lint-rules.mdx": "5cc8e8c829768bc00aabe20b86927a40b4bc86573495e1d9dbf8898eae3808c4"
     }
   },
   "zenlev-plugin-authoring": {
-    "reason": "Checked hook boundaries, registration and inferred context against the API and plugin execution. A blind assessment tested vetoes and used the ledger to distinguish audit failure from a failed migration.",
+    "reason": "Reviewed write hook registration, read-only plan evidence, and the separation of lint rule plugins from migration hooks. Reviewed updated source paths after grouping modules by responsibility.",
     "files": {
-      "src/engine.ts": "77b03212fa56a6738f33aae499bb5d65c16d20319c00b0a7c0ea00f3c5223b2e",
-      "src/execution.ts": "4db87178cd26c823513a5481c055bf887a097ccd9dd5acfbc55fd887f00c2814",
-      "src/plugins.ts": "d8569fc133dcadcd2719df9bc5301c3fd28c3a4f8f5bd4b6c0ca91a7ab6c3110",
-      "src/types.ts": "9d71d92cca286c8f4d8b1150a785fae80b0cdf91d061d0d398082b837c7e9c33",
-      "website/content/docs/guides/_skills/zenlev-plugin-authoring/SKILL.md": "c6155d42da7228f5e291d6374642fe3fdc4587c5853b0ddd9c7241c03705725c",
-      "website/content/docs/reference/api.mdx": "bafe5108a57c596a7835f5b9061b6b54885fde170b4e1902bc30c7f68831013f",
-      "website/content/docs/reference/plugins-telemetry.mdx": "e7d56f727f42b3a01c06458730d3e208f5ac06e583e7b3057452a46a81b26229"
+      "src/engine.ts": "1ad09e9341a1053208bfa608dae83c3b9aaf74fa42c87bf70af3d51705b41bb8",
+      "src/lint/plugin.ts": "f36633198b18b8bc388124cc787d45fa12480094e906f3c4014cee848f2241aa",
+      "src/lint/runner.ts": "e50964f11f400f14c14a37fc1d7c0c41aa90ec907b370c1ea350ad5e411bb0f0",
+      "src/lint/types.ts": "92ba4eabf19fcbc7fdb8c6ab6f8c4542974d77139cb8e9bba081e67b6b4cd13b",
+      "src/migrate/execution.ts": "df74a7592173384d1a961ecb5dc4c60f7a9b0defde76c1022928d70d621ce8cb",
+      "src/plugins.ts": "b9b1edf85362d2eccaf5a90abdc09f9a8d3652e9972baa80518cb60de8ea805a",
+      "src/types.ts": "6d587e0c20c9bc05a8f5b60f06811e23fd4d5ea37ee6c8ea28a50d08215b7e18",
+      "website/content/docs/guides/_skills/zenlev-plugin-authoring/SKILL.md": "81329fd863e59a9f055b7ee1d8ced1ad2a698f8007789d775fbb320a0f0dcfb5",
+      "website/content/docs/guides/linting.mdx": "aeb5d0bbe3d8972261365c2c1af473049280491b4662d9fddbd010517bd22825",
+      "website/content/docs/reference/api.mdx": "f32cb5c0613b8704be3e68ff25e50d91ea5cb3d68e3b6b059dd6dfe3bdffc385",
+      "website/content/docs/reference/lint-rules.mdx": "5cc8e8c829768bc00aabe20b86927a40b4bc86573495e1d9dbf8898eae3808c4",
+      "website/content/docs/reference/plugins-telemetry.mdx": "25c285f171b6458e910cbecb268a72aca0c5fd3aec67799e86f35525a2214a8c"
     }
   },
   "zenlev-recovery": {
-    "reason": "Checked exact ledger names, owner and attempt fields, CLI flags, and partial effects. An independent retest used the affected environment for recovery and cascade and withheld recovery without verified evidence.",
+    "reason": "Reviewed updated command guidance and confirmed that generated rollbacks lint the original down handlers during apply. Reviewed updated source paths after grouping modules by responsibility.",
     "files": {
-      "src/baseline.ts": "244161eb74d11722059a185b513a034c59c95c5d43f5fc9e9efca049859cf48c",
-      "src/rollback.ts": "45c71b6d9b991a949061ed1e3086d0b4261c06584431b9eb4acbc9b739301f42",
-      "src/store.ts": "1bcce0c022e1156bae75a879ab0d987a37942bef39368eec4393e896da240427",
-      "website/content/docs/guides/_skills/zenlev-recovery/SKILL.md": "3781d2e2c3a6f382070c3c25f774585d8cf80242cd0a6bd4879c20f0223c9639",
+      "src/migrate/baseline.ts": "91741566ca1d535136698dc95c78a1d1a9f79f4decb6ee21d3cb9b8e42665038",
+      "src/migrate/rollback.ts": "37d5c11898e3ca8ccc5ab014c820b2853f3e9254eae2ca58c9ed43ad1191c2ef",
+      "src/migrate/store.ts": "2b6c7842ccfe9483f1f43a3a0b849d2078c2f347a8d4b650449191dd9a573259",
+      "website/content/docs/guides/_skills/zenlev-recovery/SKILL.md": "e949ba9dcad7f60735cf73b05e6c31649211c1943c89bff424eb834de097cbac",
       "website/content/docs/guides/baseline.mdx": "0b4d5365e925cc0d8642d16affdc46447eba9d1df3d220fe3e223b3aa74e5be8",
       "website/content/docs/guides/rollback-recovery.mdx": "2d95722247bc1c724b1a95ee44c3e2f5f43be394b49e2a34ce9232a1bfd9a664",
-      "website/content/docs/reference/commands.mdx": "0cb2261114b9178ac76599db80b33f3ba5367e7dc94306aedf3c222e0773f516"
+      "website/content/docs/reference/commands.mdx": "43f6fd2566ed74b41778c7774591aa1216e60926dadbe5ab77fb3acf66ad485b"
     }
   },
   "zenlev-schema-diff": {
-    "reason": "Confirmed the preview and file generation commands, explicit table retention, and write authorization. Independent review traced the generation path to live ledger initialization and locking.",
+    "reason": "Reviewed shared ZModel loading and the write hook after the locked schema comparison and drop confirmation. Reviewed updated source paths after grouping modules by responsibility.",
     "files": {
-      "src/schema-catalog.ts": "ba0ca2537ce6213a20c5512b52f754b6cbe6eebecdc9d2c0acddbfc45f9a30a3",
-      "src/schema-commands.ts": "32182ef6af5f813cdca6ac49002269ff47362ae12222dbc1869868a7fe8c45c0",
-      "src/schema-diff.ts": "9580654ca390d0df095792e72665ce80a3b12b7550db0b76972077c7452c34c8",
-      "src/schema-model.ts": "30e71d1029b62379d056404b91fb73ae1937264ef4311c73335bac1ac98215c5",
-      "website/content/docs/guides/_skills/zenlev-schema-diff/SKILL.md": "db03157467466035003ec2bb66262b4f420d2a9ba29a7f537b23e6a51b0091b4",
+      "src/schema/catalog.ts": "4f4f314bdf5e2715febca98b4a13dd4a069df2b0c1e035532a0f058a5da37a4e",
+      "src/schema/commands.ts": "9587f2b199ba39684a7ae6c9dc2ad3d862bb744d0a5abd547b0e6d28b1823d98",
+      "src/schema/diff.ts": "be43303bce6a197e232c745c3cb39357b08ab07a4a1787428c6c0c7b803f6cf0",
+      "src/schema/model.ts": "3687e3d3e5a80bde17365912c01ac8aadaa61046d25cb0d792e0405b0886141d",
+      "website/content/docs/guides/_skills/zenlev-schema-diff/SKILL.md": "41a8ff5a77cedf37c7573fd3eb8119d0dd9013eafdeaa550cd9ab6fd942303e0",
       "website/content/docs/guides/schema-changes.mdx": "3bcf517c2acab1c524c883e2d92ed2192a01bae1e33bad37a603d462c323ced7",
-      "website/content/docs/reference/commands.mdx": "0cb2261114b9178ac76599db80b33f3ba5367e7dc94306aedf3c222e0773f516"
+      "website/content/docs/reference/commands.mdx": "43f6fd2566ed74b41778c7774591aa1216e60926dadbe5ab77fb3acf66ad485b"
     }
   },
   "zenlev-setup": {
-    "reason": "Checked factory ownership and connection routing against the config and adapter. A blind setup assessment identified the staging destination and stopped when it could not be verified.",
+    "reason": "Reviewed lint configuration and CLI discovery, including offline config loading without connection setup. Reviewed updated source paths after grouping modules by responsibility.",
     "files": {
+      "src/config.ts": "ee8e69b6dad490e0b09e720379624007747c9a4baa24b4f620078dba0a3bbf20",
       "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
-      "src/project-config.ts": "16d5efed2c047f52f0a21c27fdecfad1596a972c548f57085b5dcb1ccd4826c2",
-      "src/types.ts": "9d71d92cca286c8f4d8b1150a785fae80b0cdf91d061d0d398082b837c7e9c33",
-      "website/content/docs/guides/_skills/zenlev-setup/SKILL.md": "e21884928366ca36819ef45f7a168181230c6d0e2aa0a0195e4aa589d7916612",
+      "src/types.ts": "6d587e0c20c9bc05a8f5b60f06811e23fd4d5ea37ee6c8ea28a50d08215b7e18",
+      "website/content/docs/guides/_skills/zenlev-setup/SKILL.md": "bf68d72e2ec10fac6dea532f0e66399826441aba7f76da2e1fc2213061fac8f3",
       "website/content/docs/guides/namespaces.mdx": "c515f7c077218f67a4c6f1d3db2d5066ce61cb1113b7a1679bd4ad46c743d5de",
-      "website/content/docs/reference/api.mdx": "bafe5108a57c596a7835f5b9061b6b54885fde170b4e1902bc30c7f68831013f",
-      "website/content/docs/reference/configuration.mdx": "778c272dac7a91ca881917c8a6aa0e87fb43a0d6d3208928201b8918edb8600d"
+      "website/content/docs/reference/api.mdx": "f32cb5c0613b8704be3e68ff25e50d91ea5cb3d68e3b6b059dd6dfe3bdffc385",
+      "website/content/docs/reference/configuration.mdx": "fb36c881ac04b8ffbcfebea7c1a3a5fe07e56f75ff4d6bb1c2b54bc6e4804db8"
     }
   }
 }

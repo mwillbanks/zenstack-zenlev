@@ -10,13 +10,13 @@ import {
 } from './plugins'
 import { createTelemetry } from './telemetry'
 import type { Kysely } from 'kysely'
-import * as execution from './execution'
-import * as inspection from './inspection'
-import { rollback, type RollbackOptions, type RollbackResult } from './rollback'
-import { squash, type SquashOptions, type SquashResult } from './baseline'
-import { createDiffMigration, push, type PushOptions, type PushResult } from './schema-commands'
-import type { RecoveryOptions } from './store'
-import { loadProjectConfig, type ResolvedProjectConfig } from './project-config'
+import * as execution from './migrate/execution'
+import * as inspection from './migrate/inspection'
+import { rollback, type RollbackOptions, type RollbackResult } from './migrate/rollback'
+import { squash, type SquashOptions, type SquashResult } from './migrate/baseline'
+import { createDiffMigration, push, type PushOptions, type PushResult } from './schema/commands'
+import type { RecoveryOptions } from './migrate/store'
+import { loadProjectConfig, type ResolvedProjectConfig } from './config'
 import type {
   ApplyOptions,
   ApplyResult,

@@ -1,0 +1,209 @@
+---
+title: 'Lint rules'
+description: 'Configure built-in database rules and author typed lint plugins.'
+---
+
+Use complete rule IDs under `lint.rules`. Each setting accepts `off`, `warn`, `error`, or a tuple such as `['error', { format: 'snake_case' }]`.
+
+All built-in rule options accept `include`, `exclude`, and `kinds` selectors. Include and exclude patterns match qualified object identities with `*` wildcards. Use `lint.overrides` for file globs, dialects, origins, kinds, and identity globs.
+
+## Recommended rules
+
+| Rule ID                     | Default             | Rationale                                    |
+| --------------------------- | ------------------- | -------------------------------------------- |
+| `zenlev/naming/model-case`  | `error`, PascalCase | Follow ZenStack model conventions            |
+| `zenlev/naming/field-case`  | `error`, camelCase  | Follow ZenStack field conventions            |
+| `zenlev/naming/table-case`  | `error`, snake_case | Keep physical table names consistent         |
+| `zenlev/naming/column-case` | `error`, snake_case | Keep physical column names consistent        |
+| `zenlev/keys/primary-name`  | `error`, `id`       | Give single-column keys a predictable name   |
+| `zenlev/keys/no-sequential` | `error`             | Prefer keys suitable for distributed writers |
+
+The sequential-key rule covers ZModel `autoincrement()`, PostgreSQL serial, identity, and recognized sequence defaults, MySQL `AUTO_INCREMENT`, and SQLite rowid aliases. SQLite `INTEGER PRIMARY KEY` can generate values without an `AUTOINCREMENT` keyword. `WITHOUT ROWID` and the inline `PRIMARY KEY DESC` exception have different behavior.
+
+## Configurable rules
+
+| Rule ID                                                               | Options                                                                                                                            |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `zenlev/naming/model-case`, `field-case`, `table-case`, `column-case` | `format`                                                                                                                           |
+| `zenlev/naming/identifier`                                            | `format`, `prefix`, `suffix`, `pattern`, `deny`, `reserved`, `maxLength`, `quoted`, `qualified`                                    |
+| `zenlev/naming/table-number`                                          | `form: 'singular' \| 'plural' \| 'unchanged'`, `irregular`, `uncountable`                                                          |
+| `zenlev/naming/join-table`                                            | `joins` entries with `table`, `left`, `right`, `template`, `order`, and `key`                                                      |
+| `zenlev/naming/foreign-key`                                           | `template`, `separator`, inflection overrides, `composite: 'skip' \| 'check'`                                                      |
+| `zenlev/naming/constraint`                                            | `template`, `templates` by kind, `separator`, inflection overrides, `explicit`                                                     |
+| `zenlev/keys/primary-name`                                            | `template`, `separator`, inflection overrides                                                                                      |
+| `zenlev/keys/primary-type`                                            | Allowed `types` and default-generator patterns in `defaults`                                                                       |
+| `zenlev/keys/foreign-key-index`                                       | Require a full index with the foreign key's leading column order                                                                   |
+| `zenlev/constraints/required-check`                                   | Required constraint name patterns in `names`                                                                                       |
+| `zenlev/columns/required`                                             | `columns` mapping names to `type`, `nullable`, and `default`                                                                       |
+| `zenlev/columns/conventions`                                          | `types`, `prefixes`, `suffix`, `forbiddenSuffixes`, `allowedTypes`                                                                 |
+| `zenlev/objects/restricted`                                           | `kinds`, `actions`, `allow`, `languages`                                                                                           |
+| `zenlev/objects/security`                                             | `security: 'invoker' \| 'definer'`, `trustedSearchPath`, `publicExecute`                                                           |
+| `zenlev/postgres/rls`                                                 | `tables`, `enabled`, `force`, `explicitUsing`, `explicitWriteCheck`, `noBroad`, `allowedRoles`, `roles`, `commands`, `defaultDeny` |
+| `zenlev/zenstack/policies`                                            | `commands`, `postUpdate`, `noBroad`                                                                                                |
+
+Formats include `PascalCase`, `camelCase`, `snake_case`, `kebab-case`, and `UPPER_SNAKE_CASE`. Identifier limits use PostgreSQL UTF-8 bytes and MySQL character counts.
+
+Naming templates accept `{name}`, `{schema}`, `{table}`, `{tableStem}`, `{columns}`, `{target}`, `{targetStem}`, `{targetColumns}`, and `{kind}`. Join templates accept `{left}` and `{right}`. Join order accepts `declared` or `lexical`. Key shape accepts `surrogate` or `composite`.
+
+The `objects/restricted` rule permits `drop` and `call` by default. Configure `actions` to target operations explicitly. PostgreSQL routine identities include argument signatures when resolved.
+
+## Example company conventions
+
+This example selects plural physical tables, explicit relation entities, UUID primary keys, ordered constraint names, audit columns, and reverse foreign key indexes.
+
+```ts
+lint: {
+  rules: {
+    'zenlev/naming/table-number': ['error', { form: 'plural' }],
+    'zenlev/naming/foreign-key': ['error', { template: '{targetStem}_id' }],
+    'zenlev/keys/primary-type': [
+      'error',
+      { types: ['uuid'], defaults: ['gen_random_uuid()'] },
+    ],
+    'zenlev/keys/foreign-key-index': 'error',
+    'zenlev/naming/constraint': [
+      'error',
+      {
+        kinds: ['foreign-key', 'index', 'unique'],
+        explicit: true,
+        templates: {
+          'foreign-key': 'fk_{table}_{columns}',
+          index: 'idx_{table}_{columns}',
+          unique: 'uniq_{table}_{columns}',
+        },
+      },
+    ],
+    'zenlev/naming/join-table': [
+      'error',
+      {
+        joins: [
+          {
+            table: 'public.partner_program_relations',
+            left: 'partner',
+            right: 'program',
+            template: '{left}_{right}_relations',
+            key: 'surrogate',
+          },
+        ],
+      },
+    ],
+    'zenlev/columns/required': [
+      'error',
+      {
+        columns: {
+          created_at: { type: 'timestamptz', nullable: false, default: 'now()' },
+          updated_at: { type: 'timestamptz', nullable: false, default: 'now()' },
+          created_by: { type: 'uuid' },
+          updated_by: { type: 'uuid' },
+        },
+      },
+    ],
+  },
+}
+```
+
+Default expressions and physical types come from each evidence source. Match the normalized values your project inspects. Scope exceptions for externally managed tables.
+
+Use separate overrides for Boolean prefixes, JSON suffix bans, money units, and percentage columns. Select money and percentage fields explicitly because storage types cannot establish business meaning. A project-specific rule can require a migration helper such as Diesel's timestamp registration.
+
+## Author a lint rule plugin
+
+A lint rule plugin declares its name, rule metadata, options schema, and visitors. Visitor keys match normalized node kinds, such as `table`, `column`, `function`, or `zenstack-policy`. The `*` visitor receives each selected node.
+
+```ts
+import type { LintRulePlugin } from '@mwillbanks/zenstack-zenlev'
+
+export default {
+  meta: { name: 'company' },
+  rules: {
+    'no-shared-function': {
+      meta: {
+        schema: [],
+        messages: { prohibited: 'Move shared function {{name}} into application code.' },
+      },
+      create(context) {
+        return {
+          function(node) {
+            if (node.name === 'set_updated_at' && node.action !== 'drop') {
+              context.report({
+                node,
+                messageId: 'prohibited',
+                data: { name: node.name },
+              })
+            }
+          },
+        }
+      },
+    },
+  },
+} satisfies LintRulePlugin
+```
+
+Load the plugin from a TypeScript or JSON configuration.
+
+```ts
+lint: {
+  plugins: [{ name: 'company', specifier: './database-lint.ts' }],
+  rules: { 'company/no-shared-function': 'error' },
+}
+```
+
+Plugin specifiers resolve relative to the declaring configuration. TypeScript configurations also accept inline plugin objects. Plugin aliases and rule IDs must be unique.
+
+Use `context.options` for validated rule options, `context.nodes` for related evidence, `context.capabilities` for available metadata, and `context.gap()` for missing evidence. Report only what the input establishes.
+
+```ts
+import { testLintRule } from '@mwillbanks/zenstack-zenlev'
+import company from './database-lint'
+
+const result = await testLintRule(company.rules['no-shared-function'], {
+  nodes: [
+    {
+      kind: 'function',
+      name: 'set_updated_at',
+      origin: 'sql',
+      dialect: 'postgresql',
+      action: 'create',
+    },
+  ],
+  gaps: [],
+})
+```
+
+For PostgreSQL projects that use Diesel's timestamp helper, scope a project rule to SQL files that create one table each. Check that each file calls the helper after creating the table. The example assumes Diesel installed its helper in `public`. [Diesel setup SQL](https://github.com/diesel-rs/diesel/blob/main/diesel_cli/src/setup_sql/postgres/initial_setup/up.sql)
+
+```ts
+import type { LintRule } from '@mwillbanks/zenstack-zenlev'
+
+export const requireTimestampHelper: LintRule = {
+  meta: {
+    schema: [],
+    messages: { missing: 'Call public.diesel_manage_updated_at for {{table}} in this file.' },
+  },
+  create(context) {
+    return {
+      table(node) {
+        if (node.origin !== 'sql' || node.action !== 'create' || !node.source) return
+        const source = node.source
+        const registered = context.nodes.some(
+          (candidate) =>
+            candidate.kind === 'function' &&
+            candidate.action === 'call' &&
+            candidate.identity === 'public.diesel_manage_updated_at' &&
+            candidate.source?.path === source.path &&
+            candidate.source.line > source.line,
+        )
+        if (!registered) context.report({ node, messageId: 'missing', data: { table: node.name } })
+      },
+    }
+  },
+}
+```
+
+Register this rule in the plugin's `rules` map. Enable it with a file override for the SQL files that follow this convention. Keep the table name in the call consistent with the table declaration.
+
+The authoring shape follows Oxlint's rule API. Zenlev supplies database nodes and owns traversal. Use Zenlev's exported `LintRule`, `LintRuleContext`, and `LintNode` types when extending it.
+
+When contributing a built-in rule, place its visitor and option schema together in the matching family under `src/lint/rules/`. Register the rule in `src/lint/rules.ts`. Use normalized evidence and `testLintRule()` so rule tests can run without a SQL parser or a database.
+
+See the [lint guide](./guides/linting) for CI, catalog audits, exceptions, and write enforcement.

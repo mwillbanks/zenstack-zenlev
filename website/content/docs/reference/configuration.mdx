@@ -34,23 +34,34 @@ Zenlev passes environment selection to your code without changing process global
 
 ## Settings
 
-| Setting                           | Default or purpose                                |
-| --------------------------------- | ------------------------------------------------- |
-| `cwd`                             | Effective project working directory               |
-| `env`                             | `NODE_ENV`, or `development` when unset           |
-| `migrationsDir`                   | `migrations`, relative to effective `cwd`         |
-| `schema`                          | Explicit ZModel path, relative to effective `cwd` |
-| `namespaces`                      | Optional namespace descriptions                   |
-| `hashing.algorithm`               | `sha256`                                          |
-| `hashing.normalizeLineEndings`    | `true`, normalizes CRLF to LF                     |
-| `diff.excludeViews`               | `true`                                            |
-| `plugins`                         | Plugins in registration order                     |
-| `onWarning`                       | Structured warning callback                       |
-| `telemetry.opentelemetry.enabled` | `false`                                           |
+| Setting                           | Default or purpose                                    |
+| --------------------------------- | ----------------------------------------------------- |
+| `cwd`                             | Effective project working directory                   |
+| `env`                             | `NODE_ENV`, or `development` when unset               |
+| `migrationsDir`                   | `migrations`, relative to effective `cwd`             |
+| `schema`                          | Explicit ZModel path, relative to effective `cwd`     |
+| `namespaces`                      | Optional namespace descriptions                       |
+| `hashing.algorithm`               | `sha256`                                              |
+| `hashing.normalizeLineEndings`    | `true`, normalizes CRLF to LF                         |
+| `diff.excludeViews`               | `true`                                                |
+| `plugins`                         | Plugins in registration order                         |
+| `lint`                            | Recommended database lint rules and project overrides |
+| `onWarning`                       | Structured warning callback                           |
+| `telemetry.opentelemetry.enabled` | `false`                                               |
 
 Namespace descriptions provide configuration metadata. Select migration namespaces explicitly when invoking apply, status, or tree.
 
 SHA-512, SHA-1, and MD5 are also supported hash algorithms. Keep hash settings stable across environments that share migration files.
+
+## Lint configuration
+
+Set `lint.presets`, `rules`, `sql`, `overrides`, `plugins`, and `exceptions` for database policy. The default preset is `recommended`. Set `zmodel: false` for SQL-only projects and `migrations: false` to exclude migration source. Set `dialect` when SQL files need an explicit parser dialect.
+
+Rule settings merge by ID across configuration layers. Arrays replace lower-layer arrays. Matching overrides apply in declaration order. Lint plugin specifiers resolve relative to their declaring configuration.
+
+The offline lint command skips `clientModule` loading and connection acquisition. TypeScript config modules still execute when imported. Live audits use the selected environment connection. Register `lintPlugin()` in the existing migration `plugins` array for write enforcement.
+
+See [Database linting](./guides/linting) for examples and [Lint rules](./reference/lint-rules) for accepted options.
 
 ## JSON configuration
 

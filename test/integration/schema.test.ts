@@ -4,9 +4,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Kysely } from 'kysely'
 import { createKyselyAdapter, createZenlev, type Warning, type Zenlev } from '../../src'
-import { createBunSqliteDialect } from '../fixtures/bun-sqlite'
-import { readCatalog } from '../../src/schema-catalog'
-import { loadSchemaModel } from '../../src/schema-model'
+import { createBunSqliteDialect } from '../fixtures/sqlite'
+import { readCatalog } from '../../src/schema/catalog'
+import { loadSchemaModel } from '../../src/schema/model'
 
 const sqlite = 'datasource db { provider = "sqlite" }\n'
 const current =
@@ -171,13 +171,19 @@ test('reads SQLite constraints and reports catalog objects that require manual m
       num DECIMAL DEFAULT (40.5),
       expression TEXT DEFAULT (lower('DEFAULT'))
     );
+    CREATE TABLE composite (left_id INTEGER, right_id INTEGER, PRIMARY KEY(right_id, left_id));
     CREATE TABLE generated (id INTEGER PRIMARY KEY, amount INT, doubled INT
       GENERATED ALWAYS AS (amount * 2) STORED, CHECK (amount > 0));
     CREATE INDEX ordered_code ON parent(code DESC) WHERE code IS NOT NULL;
+    CREATE INDEX collated_code ON parent(code COLLATE NOCASE);
     CREATE VIEW enabled AS SELECT id FROM parent;
   `)
   const target = await loadSchemaModel({ cwd })
   const live = await readCatalog(db, target, [], false)
+  expect(live.tables.find(({ name }) => name === 'composite')?.primaryKey).toEqual([
+    'right_id',
+    'left_id',
+  ])
   const details = live.tables.find(({ name }) => name === 'details')!
   expect(details.foreignKeys).toEqual(
     expect.arrayContaining([
@@ -206,8 +212,8 @@ test('reads SQLite constraints and reports catalog objects that require manual m
     'implicit SQLite foreign key',
   )
   expect(live.unsupported.map(({ message }) => message).join('\n')).toContain('generated columns')
-  expect(live.unsupported.map(({ message }) => message).join('\n')).toContain(
-    'ordered, or collated index',
+  expect(live.unsupported.map(({ message }) => message).join('\n')).toMatch(
+    /ordered, or collated index collated_code/,
   )
 })
 

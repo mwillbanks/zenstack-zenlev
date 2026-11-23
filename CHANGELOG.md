@@ -6,6 +6,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 
 ## [Unreleased]
 
+### Added
+
+- Ship offline and live database linting with recommended ZModel mapping and primary-key rules, configurable conventions, and lint rule plugins.
+- Add `lintPlugin()` and a final-plan write hook that can reject migration apply and schema push before user SQL executes.
+- Document lint adoption, catalog capabilities, rule configuration, custom plugins, and reviewed exceptions.
+
 ## [0.2.0] - 2026-11-23
 
 ### Added

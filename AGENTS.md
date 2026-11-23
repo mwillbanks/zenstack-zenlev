@@ -4,17 +4,20 @@ Zenlev is a Bun-native TypeScript migration engine for ZenStack V3 and standalon
 
 ## Architecture
 
-| Area                          | Start here                                                                                     | Ownership                                                                                        |
-| ----------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Public contracts and dispatch | `src/index.ts`, `src/types.ts`, `src/engine.ts`                                                | Public exports, typed migration context, command lifecycle, and resource cleanup                 |
-| Configuration and connections | `src/config.ts`, `src/project-config.ts`, `src/database.ts`                                    | Config discovery, environment routing, adapter capabilities, and transaction scope               |
-| Files, graph, and inspection  | `src/migrations.ts`, `src/graph.ts`, `src/inspection.ts`                                       | Migration loading and hashes, effective graph, plan selection, and read-only status              |
-| Execution and history         | `src/execution.ts`, `src/store.ts`, `src/rollback.ts`, `src/baseline.ts`                       | Apply, locks, audit records, recovery, generated rollback, and baseline adoption                 |
-| Schema changes                | `src/schema-model.ts`, `src/schema-catalog.ts`, `src/schema-diff.ts`, `src/schema-commands.ts` | ZModel loading, physical catalog inspection, ordered changes, and shared preview and apply paths |
-| Extensions                    | `src/plugins.ts`, `src/warnings.ts`, `src/telemetry.ts`                                        | Typed hooks, warnings, and opt-in trace reporting                                                |
-| CLI                           | `src/cli.ts`, `src/cli-render.ts`                                                              | Option parsing, exit status, JSON, plain output, and lazy TTY rendering with Tuil                |
+| Area                          | Start here                                                                                               | Ownership                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Public contracts and dispatch | `src/index.ts`, `src/types.ts`, `src/engine.ts`                                                          | Public exports, typed migration context, command lifecycle, and resource cleanup                 |
+| Configuration and connections | `src/config.ts`, `src/database.ts`                                                                       | Config discovery, environment routing, adapter capabilities, and transaction scope               |
+| Files, graph, and inspection  | `src/migrate/files.ts`, `src/migrate/graph.ts`, `src/migrate/inspection.ts`                              | Migration loading and hashes, effective graph, plan selection, and read-only status              |
+| Execution and history         | `src/migrate/execution.ts`, `src/migrate/store.ts`, `src/migrate/rollback.ts`, `src/migrate/baseline.ts` | Apply, locks, audit records, recovery, generated rollback, and baseline adoption                 |
+| Schema changes                | `src/schema/model.ts`, `src/schema/catalog.ts`, `src/schema/diff.ts`, `src/schema/commands.ts`           | ZModel loading, physical catalog inspection, ordered changes, and shared preview and apply paths |
+| Database linting              | `src/lint.ts`, `src/lint/source/`, `src/lint/rules/`                                                     | Lint entry points, normalized source evidence, and rule families                                 |
+| Extensions                    | `src/plugins.ts`, `src/warnings.ts`, `src/telemetry.ts`                                                  | Typed hooks, warnings, and opt-in trace reporting                                                |
+| CLI                           | `src/cli.ts`, `src/cli/render.ts`                                                                        | Option parsing, exit status, JSON, plain output, and lazy TTY rendering with Tuil                |
 
 Keep schema, client construction, SQL catalogs, telemetry, and terminal rendering outside the graph. Use Bun's native TypeScript loader and bundler. Keep project config, migrations, and consumer database dependencies runtime-resolved.
+
+Group related source and tests in directories by responsibility. Use dialect directories for parser and catalog adapters. Keep built-in rule visitors and option schemas together within their rule family.
 
 ### Graph and ledger
 

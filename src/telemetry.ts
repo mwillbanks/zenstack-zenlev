@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type { SpanLimits } from '@opentelemetry/sdk-trace'
-import type { Span, SpanExporter, ReadableSpan } from './telemetry-types'
+import type { Span, SpanExporter, ReadableSpan } from './telemetry/types'
 import type { Attributes, Reporter, ReporterSpan, ZenlevSettings } from './types'
 
 type TelemetryOptions = NonNullable<ZenlevSettings['telemetry']>['opentelemetry']

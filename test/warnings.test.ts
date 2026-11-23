@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { Kysely } from 'kysely'
 import { operationWarnings } from '../src/warnings'
 import type { Warning } from '../src/types'
-import { createBunSqliteDialect } from './fixtures/bun-sqlite'
+import { createBunSqliteDialect } from './fixtures/sqlite'
 
 test('identifies Kysely type changes, drops, and uniqueness from compiled statements', async () => {
   const db = new Kysely<{ entries: { key: string } }>({
