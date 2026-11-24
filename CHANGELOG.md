@@ -23,6 +23,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 - Preserve constraint, index, and policy identities when checking planned changes against the database catalog.
 - Track foreign-key index coverage after index drops in offline lint and write plans.
 - Report class, member, and legacy parameter decorators that can run during migration import.
+- Warn about dynamic migration imports that static lint cannot inspect.
 - Report gaps in column, constraint, and routine metadata without treating unknown values as policy violations.
 - Preserve schema definitions and object dependencies when diffing SQLite, PostgreSQL, and MySQL catalogs.
 - Respect MySQL namespace case modes and preserve integer default precision during schema comparison.

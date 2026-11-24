@@ -114,6 +114,26 @@ describe('migration source inspection', () => {
     ])
   })
 
+  test('warns about dynamic module loads without executing them', async () => {
+    const input = await migration(`
+      import { sql } from 'kysely'
+      const eager = import('./eager.ts')
+      export async function up(ctx, fallback = import('./fallback.ts')) {
+        await import('./up.ts')
+        await sql\`SELECT * FROM users WHERE id = \${(await import('./bound.ts')).id}\`.execute(ctx.db.kysely)
+      }
+      export async function down() {
+        await import('./down.ts')
+      }
+    `)
+    expect(input.gaps.map(({ message, source }) => [message, source?.line])).toEqual([
+      ['Top-level migration initialization may execute before lint enforcement.', 3],
+      ['Dynamically imported migration module cannot be inspected.', 4],
+      ['Dynamically imported migration module cannot be inspected.', 5],
+      ['Dynamically imported migration module cannot be inspected.', 6],
+    ])
+  })
+
   test('never imports modules and respects handler direction', async () => {
     const input = await migration(
       "import { sql as query } from 'kysely'; throw new Error('must never run'); export async function up(ctx) { await query.raw('CREATE TABLE users (id text PRIMARY KEY)').execute(ctx.db.kysely) } export async function down(ctx) { await query.raw('DROP TABLE users').execute(ctx.db.kysely) }",

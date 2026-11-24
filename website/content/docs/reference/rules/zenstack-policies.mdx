@@ -18,7 +18,7 @@ export default defineConfig({
       'zenlev/zenstack/policies': [
         'error',
         {
-          include: ['orders.Order'],
+          include: ['public.Order'],
           commands: ['read', 'update'],
           postUpdate: true,
           noBroad: true,
@@ -39,4 +39,4 @@ All built-in rules accept the [shared selectors](./reference/lint-rules#shared-s
 
 ## Example
 
-For `Order` mapped to `orders`, give read and update an applicable allow predicate and add a separate `post-update` policy to check the resulting row. Validate the predicates for the application role.
+For this PostgreSQL example, `public.Order` selects the logical model in the `public` schema. Use `@@map("orders")` to set its physical table name. Give read and update applicable allow predicates, then add a separate `post-update` policy. Validate the predicates for the application role.

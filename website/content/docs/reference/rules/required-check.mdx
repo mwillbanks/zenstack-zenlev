@@ -3,7 +3,7 @@ title: 'Required CHECK constraints'
 description: 'Require at least one CHECK constraint or specific names on selected tables.'
 ---
 
-Evaluates the available table and constraint evidence. When name or constraint inventory is unavailable, it reports a coverage gap.
+Evaluates the available table and constraint evidence. Without `names`, any existing CHECK declaration satisfies the rule even when its name is unknown. It reports a coverage gap when inventory is unavailable or when a configured name cannot be verified.
 
 Enable this opt-in rule under `lint.rules`.
 

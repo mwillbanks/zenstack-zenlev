@@ -91,6 +91,11 @@ export async function readMigrationLintInputs(
     }
   }
   const gap = (node: Node, message: string) => gaps.push({ message, source: location(node) })
+  const inspectDynamicImports = (node: Node): void => {
+    if (node.type === 'ImportExpression')
+      gap(node, 'Dynamically imported migration module cannot be inspected.')
+    else children(node, inspectDynamicImports)
+  }
   const isSql = (node: Node) => node.type === 'Identifier' && sqlAliases.has(node.name)
   const isRawSql = (node: Node) =>
     node.type === 'CallExpression' &&
@@ -108,6 +113,7 @@ export async function readMigrationLintInputs(
         let sql = node.quasi.quasis[0]?.value.cooked ?? ''
         let dynamic = node.quasi.quasis.some(({ value }) => value.cooked == null)
         for (const [index, expression] of node.quasi.expressions.entries()) {
+          inspectDynamicImports(expression)
           const valuePosition = /(?:=|<>|!=|<=|>=|<|>|\bVALUES\s*\(|,|\bIN\s*\()\s*$/i.test(
             sql.trimEnd(),
           )
@@ -129,6 +135,10 @@ export async function readMigrationLintInputs(
         if (dynamic) gap(node, 'Dynamic SQL structure cannot be analyzed.')
         else queries.push({ sql, source: location(node), anchor: true })
       }
+      return
+    }
+    if (node.type === 'ImportExpression') {
+      inspectDynamicImports(node)
       return
     }
     if (node.type === 'CallExpression') {
@@ -168,6 +178,7 @@ export async function readMigrationLintInputs(
     }
     if (
       node.type === 'Decorator' ||
+      node.type === 'ImportExpression' ||
       node.type === 'CallExpression' ||
       node.type === 'NewExpression' ||
       node.type === 'TaggedTemplateExpression' ||
@@ -187,6 +198,7 @@ export async function readMigrationLintInputs(
       const name = statement.id?.name
       if (name && isDirection(name) && statement.body) {
         inspected.add(name)
+        for (const parameter of statement.params) visit(parameter)
         visit(statement.body)
       }
     } else if (statement.type === 'VariableDeclaration') {

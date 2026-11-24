@@ -36,7 +36,7 @@ export default defineConfig({
 ## Parameters
 
 - `tables` selects qualified table patterns. `enabled` defaults to `true`. `force: true` also requires `FORCE ROW LEVEL SECURITY`.
-- `explicitUsing` requires `USING` for applicable read or update policies. `explicitWriteCheck` requires a written `WITH CHECK` on `INSERT`, `UPDATE`, and `ALL` policies, even when PostgreSQL would use the fallback.
+- `explicitUsing` requires a written `USING` predicate on `SELECT`, `UPDATE`, `DELETE`, and `ALL` policies. `explicitWriteCheck` requires a written `WITH CHECK` on `INSERT`, `UPDATE`, and `ALL` policies, even when PostgreSQL would use the `USING` fallback.
 - `noBroad` flags literal true predicates. `allowedRoles` lists permitted policy targets.
 - `roles` lists roles to check for operation coverage and defaults to `public`. `commands` accepts `select`, `insert`, `update`, and `delete`.
 - `defaultDeny: true` skips the operation coverage requirement for intentionally closed tables.

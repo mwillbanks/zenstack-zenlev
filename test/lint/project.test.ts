@@ -44,6 +44,9 @@ for (const dialect of ['sqlite', 'mysql', 'postgresql'] as const) {
     `,
     )
     const input = await readZModelLintInput({ cwd })
+    expect(input.nodes.find((node) => node.kind === 'model')?.identity).toBe(
+      dialect === 'postgresql' ? 'public.Item' : 'Item',
+    )
     const column = (name: string) =>
       input.nodes.find((node) => node.kind === 'column' && node.name === name)!
     expect(column('id').default).toBeUndefined()
@@ -198,12 +201,17 @@ model Item with Audited {
       rules: {
         'zenlev/zenstack/policies': [
           'error',
-          { include: ['items.Item'], commands: ['create', 'read', 'update'] },
+          { include: ['Item'], commands: ['create', 'read', 'update'], noBroad: true },
         ],
       },
     },
   })
-  expect(audited.diagnostics).toEqual([])
+  expect(audited.diagnostics).toEqual([
+    expect.objectContaining({
+      ruleId: 'zenlev/zenstack/policies',
+      message: 'Replace the unconditional ZenStack allow policy.',
+    }),
+  ])
 })
 
 test('loads offline config without the client module and lints migration source without imports', async () => {

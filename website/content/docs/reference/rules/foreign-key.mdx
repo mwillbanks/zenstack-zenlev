@@ -23,7 +23,7 @@ export default defineConfig({
 
 ## Parameters
 
-- `template` defaults to `{targetStem}_id`. `separator` joins column lists in template substitutions and defaults to `_`.
+- `template` defaults to `{targetStem}_id` for single-column foreign keys.
 - `irregular` maps singular forms to plural forms. `uncountable` preserves the listed forms.
 - `composite` defaults to `skip`. With `check`, each source column must match the singular target table name followed by `_` and the corresponding target column.
 

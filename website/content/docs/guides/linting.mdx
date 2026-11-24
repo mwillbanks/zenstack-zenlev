@@ -71,7 +71,7 @@ export default defineConfig({
 })
 ```
 
-Offline lint uses Oxc to read both `up` and `down` migration handlers. It recognizes supported Kysely schema builders, static SQL strings, and Kysely SQL templates with bound values. Dynamic SQL, unresolved helper effects, and opaque procedural bodies produce coverage warnings. Plain SQL and unescaped TypeScript literals can point to the SQL token. Escaped strings, interpolated templates, and Kysely builders point to the enclosing source expression. PostgreSQL source signatures use authored argument text where available. Live signatures use catalog input types. Source call rules recognize explicit `CALL` and qualified calls in supported SQL queries. Unqualified function calls can produce unresolved-identity warnings. Function overload selection can depend on runtime argument types.
+Offline lint uses Oxc to read both `up` and `down` migration handlers. It recognizes supported Kysely schema builders, static SQL strings, and Kysely SQL templates with bound values. Dynamic SQL, dynamic module imports, unresolved helper effects, and opaque procedural bodies produce coverage warnings. Plain SQL and unescaped TypeScript literals can point to the SQL token. Escaped strings, interpolated templates, and Kysely builders point to the enclosing source expression. PostgreSQL source signatures use authored argument text where available. Live signatures use catalog input types. Source call rules recognize explicit `CALL` and qualified calls in supported SQL queries. Unqualified function calls can produce unresolved-identity warnings. Function overload selection can depend on runtime argument types.
 
 ## Install the parser for your SQL dialect
 
