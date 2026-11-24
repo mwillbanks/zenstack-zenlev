@@ -91,10 +91,9 @@ export async function readMigrationLintInputs(
     }
   }
   const gap = (node: Node, message: string) => gaps.push({ message, source: location(node) })
-  const inspectDynamicImports = (node: Node): void => {
-    if (node.type === 'ImportExpression')
-      gap(node, 'Dynamically imported migration module cannot be inspected.')
-    else children(node, inspectDynamicImports)
+  const visitTemplateImports = (node: Node): void => {
+    if (node.type === 'ImportExpression') visit(node)
+    else children(node, visitTemplateImports)
   }
   const isSql = (node: Node) => node.type === 'Identifier' && sqlAliases.has(node.name)
   const isRawSql = (node: Node) =>
@@ -105,7 +104,7 @@ export async function readMigrationLintInputs(
   const builder = readKyselyBuilder(dialect, isSql, gap, (sql, expression) => {
     queries.push({ sql, source: location(expression), portable: true, anchor: true })
   })
-  const visit = (node: Node) => {
+  function visit(node: Node): void {
     if (node.type === 'TaggedTemplateExpression' && isSql(node.tag)) {
       const literal = staticString(node.quasi)
       if (literal !== undefined) literalQuery(literal, node.quasi)
@@ -113,7 +112,7 @@ export async function readMigrationLintInputs(
         let sql = node.quasi.quasis[0]?.value.cooked ?? ''
         let dynamic = node.quasi.quasis.some(({ value }) => value.cooked == null)
         for (const [index, expression] of node.quasi.expressions.entries()) {
-          inspectDynamicImports(expression)
+          visitTemplateImports(expression)
           const valuePosition = /(?:=|<>|!=|<=|>=|<|>|\bVALUES\s*\(|,|\bIN\s*\()\s*$/i.test(
             sql.trimEnd(),
           )
@@ -137,10 +136,8 @@ export async function readMigrationLintInputs(
       }
       return
     }
-    if (node.type === 'ImportExpression') {
-      inspectDynamicImports(node)
-      return
-    }
+    if (node.type === 'ImportExpression')
+      gap(node, 'Dynamically imported migration module cannot be inspected.')
     if (node.type === 'CallExpression') {
       if (isRawSql(node)) {
         const argument = node.arguments[0]

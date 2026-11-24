@@ -12,25 +12,25 @@
     }
   },
   "zenlev-linting": {
-    "reason": "Verified dynamic import coverage and corrected rule parameter and selector guidance.",
+    "reason": "Verified SQL evidence inside computed import arguments while retaining opaque module warnings.",
     "files": {
       "package.json": "6da71ebe1fa047b7bb97326b06043a5cda6f3be165d16155a7e1c55e0f5e6585",
       "src/lint/plugin.ts": "f58991315764d4592d092593b6a6313b3a44271815df55f52b7c2d72fae11374",
       "src/lint/project.ts": "a442054ac441684e36aed583cf646bee87ec8e70908b20f8a8d4fd43f581eef2",
       "src/lint/rules.ts": "807cf21c7b1b53da5ed6e61b8c91a8cb9ab09432130a5c8928f5bbbef42448a6",
       "src/lint/runner.ts": "f4089d99494250bb41084e3eed85ba10339610b6be718594f81d3f2b581e1cdf",
-      "src/lint/source/migration.ts": "55528bff4a9bc265efd0d79f409a74ded8b52a67d9f5a8a1091a1ada213adfb7",
+      "src/lint/source/migration.ts": "d37ac42b1b452506fbd69bebb69629b8c7425759b7a9069fee758c50720b59a5",
       "website/content/docs/guides/_skills/zenlev-linting/SKILL.md": "46df7ab14916f79fbb6a635e1ae4da902aeb188609d6b91970882f3ce23c3807",
       "website/content/docs/guides/linting.mdx": "7a5990586a1e42540f1df2ec830b8dbc3e988364291e6aa1d5ce4a77ff70f01d",
       "website/content/docs/reference/lint-rules.mdx": "5f404c61671ca76b66664508c1b3a52e97a6eb7d8c0d90fcb1f95eaba8d857f9"
     }
   },
   "zenlev-migration-authoring": {
-    "reason": "Verified source coverage for dynamic imports during initialization and handler execution.",
+    "reason": "Verified SQL evidence inside computed import arguments while retaining opaque module warnings.",
     "files": {
       "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
       "src/lint/project.ts": "a442054ac441684e36aed583cf646bee87ec8e70908b20f8a8d4fd43f581eef2",
-      "src/lint/source/migration.ts": "55528bff4a9bc265efd0d79f409a74ded8b52a67d9f5a8a1091a1ada213adfb7",
+      "src/lint/source/migration.ts": "d37ac42b1b452506fbd69bebb69629b8c7425759b7a9069fee758c50720b59a5",
       "src/lint/zmodel.ts": "7830287f86eec7153c5c85e22d69612adc29054103894eb90b482947c9ebc12f",
       "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
       "src/migrate/files.ts": "02eb7ce82e97b2f81c322e375c90219dc894b63315636068da763afedfb1bfa3",

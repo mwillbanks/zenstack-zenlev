@@ -134,6 +134,24 @@ describe('migration source inspection', () => {
     ])
   })
 
+  test('inspects SQL evaluated inside a dynamic import expression', async () => {
+    const input = await migration(`
+      import { sql } from 'kysely'
+      export async function up(ctx) {
+        await import((await sql.raw('CREATE VIEW handler_view AS SELECT 1').execute(ctx.db.kysely), './helper.ts'))
+        await sql\`SELECT * FROM users WHERE id = \${(await import((await sql.raw('CREATE VIEW bound_view AS SELECT 1').execute(ctx.db.kysely), './bound.ts'))).id}\`.execute(ctx.db.kysely)
+      }
+    `)
+    expect(input.nodes.filter(({ kind }) => kind === 'view').map(({ name }) => name)).toEqual([
+      'handler_view',
+      'bound_view',
+    ])
+    expect(input.gaps.map(({ message }) => message)).toEqual([
+      'Dynamically imported migration module cannot be inspected.',
+      'Dynamically imported migration module cannot be inspected.',
+    ])
+  })
+
   test('never imports modules and respects handler direction', async () => {
     const input = await migration(
       "import { sql as query } from 'kysely'; throw new Error('must never run'); export async function up(ctx) { await query.raw('CREATE TABLE users (id text PRIMARY KEY)').execute(ctx.db.kysely) } export async function down(ctx) { await query.raw('DROP TABLE users').execute(ctx.db.kysely) }",
