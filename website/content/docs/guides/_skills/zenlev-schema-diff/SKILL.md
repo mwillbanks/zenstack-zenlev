@@ -9,10 +9,10 @@ metadata:
   zenlev_sources: |-
     website/content/docs/guides/schema-changes.mdx
     website/content/docs/reference/commands.mdx
-    src/schema-commands.ts
-    src/schema-catalog.ts
-    src/schema-diff.ts
-    src/schema-model.ts
+    src/schema/commands.ts
+    src/schema/catalog.ts
+    src/schema/diff.ts
+    src/schema/model.ts
 ---
 
 # Review the change set before execution

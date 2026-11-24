@@ -1,0 +1,48 @@
+---
+title: 'PostgreSQL row-level security'
+description: 'Check native PostgreSQL RLS flags, policy predicates, roles, and operation coverage.'
+---
+
+Checks PostgreSQL tables and policies from available state. It models write-check fallback to `USING` for `UPDATE` and `ALL` policies. Use role-based integration tests to verify behavior.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/postgres/rls': [
+        'error',
+        {
+          tables: ['app.orders'],
+          force: true,
+          explicitUsing: true,
+          explicitWriteCheck: true,
+          noBroad: true,
+          roles: ['app_user'],
+          allowedRoles: ['app_user'],
+          commands: ['select', 'update'],
+        },
+      ],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `tables` selects qualified table patterns. `enabled` defaults to `true`. `force: true` also requires `FORCE ROW LEVEL SECURITY`.
+- `explicitUsing` requires a written `USING` predicate on `SELECT`, `UPDATE`, `DELETE`, and `ALL` policies. `explicitWriteCheck` requires a written `WITH CHECK` on `INSERT`, `UPDATE`, and `ALL` policies, even when PostgreSQL would use the `USING` fallback.
+- `noBroad` flags literal true predicates. `allowedRoles` lists permitted policy targets.
+- `roles` lists roles to check for operation coverage and defaults to `public`. `commands` accepts `select`, `insert`, `update`, and `delete`.
+- `defaultDeny: true` skips the operation coverage requirement for intentionally closed tables.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+Enable and force RLS on `app.orders`. Provide a permissive `SELECT` policy with `USING` and an `UPDATE` policy with both `USING` and `WITH CHECK` for `app_user`.

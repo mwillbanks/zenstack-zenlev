@@ -23,6 +23,19 @@ Run `zenlev --help` or `zenlev migrate apply --help` to inspect the installed ve
 
 Hash and telemetry settings also have CLI overrides. See [Configuration](./reference/configuration) and [Plugins and telemetry](./reference/plugins-telemetry).
 
+## Database linting
+
+```sh
+bun run zenlev lint --max-warnings 0 --json
+bun run zenlev lint --live --env staging
+```
+
+The offline command inspects ZModel, migration handlers, and configured SQL files. It uses ZenStack's parser and skips migration module imports and database acquisition. `--live` reads the configured database catalog. `--max-warnings <n>` sets a nonnegative warning budget, including coverage gaps and stale exceptions.
+
+Lint returns exit code 0 on success, 1 on rule or warning-budget failure, and 2 on configuration, input, plugin, or audit execution errors. JSON follows the command's structured output contract.
+
+Register `lintPlugin()` in `plugins` to enforce policy before migration apply and schema push. See [Database linting](./guides/linting) and [Lint rules](./reference/lint-rules).
+
 ## Schema work
 
 | Command                                                     | Purpose                                           |
@@ -106,7 +119,7 @@ bun run zenlev migrate apply --env staging --namespace predeploy --plan-only --j
 bun run zenlev db push --drop-missing-tables=skip --json
 ```
 
-JSON results contain an outer `status` and `result`. Successful commands return exit code 0. Errors, blockers, failures, and partial execution return exit code 1.
+JSON results contain an outer `status` and `result`. Successful commands return exit code 0. Migration errors, blockers, failures, and partial execution return exit code 1. Lint also uses exit code 2 for execution and configuration errors.
 
 Human TTY output uses the cell renderer. Redirected output uses plain text. JSON output excludes progress frames and ANSI sequences.
 

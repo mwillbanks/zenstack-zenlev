@@ -1,0 +1,46 @@
+---
+title: 'Constraint and index names'
+description: 'Configure explicit names and naming templates for keys, constraints, and indexes.'
+---
+
+Checks primary keys, foreign keys, indexes, unique constraints, checks, and exclusion constraints.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/naming/constraint': [
+        'error',
+        {
+          kinds: ['index', 'foreign-key'],
+          templates: {
+            index: 'idx_{table}_{columns}',
+            'foreign-key': 'fk_{table}_{columns}',
+          },
+          explicit: true,
+        },
+      ],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `template` sets the fallback format. `templates` supplies templates by kind using `primary-key`, `foreign-key`, `index`, `unique`, `check`, or `exclusion`.
+- `separator` joins column lists and defaults to `_`. `irregular` and `uncountable` customize inflection.
+- `explicit: true` requires authored names. `explicit: false` requires generated names. The check reports a coverage gap when the evidence cannot establish how a name was chosen.
+
+See the rule overview for [naming template variables](./reference/lint-rules#naming-templates).
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+For `orders` with a foreign key on `customer_id`, use `fk_orders_customer_id`. Name the matching index `idx_orders_customer_id`.

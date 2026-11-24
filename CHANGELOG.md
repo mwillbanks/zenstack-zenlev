@@ -6,6 +6,29 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 
 ## [Unreleased]
 
+### Added
+
+- Ship offline and live database linting with recommended ZModel mapping and primary-key rules, configurable conventions, and lint rule plugins.
+- Add `lintPlugin()` and a final-plan write hook that can reject migration apply and schema push before user SQL executes.
+- Document lint adoption, catalog capabilities, rule configuration, custom plugins, and reviewed exceptions.
+- Ship the database linting skill and publish an individual configuration and example page for every built-in rule.
+
+### Changed
+
+- Represent supported Kysely migration builders and generated schema push statements as structured lint evidence before SQL rendering.
+- Use Oxc to inspect TypeScript migrations and TypeBox to validate JSON Schema rule options.
+- Let consumers select compatible ZenStack and OpenTelemetry peers. Tuil declares the React requirement. Install the optional parser peer for each dialect that needs SQL analysis.
+
+### Fixed
+
+- Preserve constraint, index, and policy identities when checking planned changes against the database catalog.
+- Track foreign-key index coverage after index drops in offline lint and write plans.
+- Report class, member, and legacy parameter decorators that can run during migration import.
+- Warn about opaque migration imports and check SQL executed while computing import arguments.
+- Report gaps in column, constraint, and routine metadata without treating unknown values as policy violations.
+- Preserve schema definitions and object dependencies when diffing SQLite, PostgreSQL, and MySQL catalogs.
+- Respect MySQL namespace case modes and preserve integer default precision during schema comparison.
+
 ## [0.2.0] - 2026-11-23
 
 ### Added

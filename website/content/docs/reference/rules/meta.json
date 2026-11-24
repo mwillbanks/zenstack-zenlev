@@ -1,0 +1,25 @@
+{
+  "title": "Individual lint rules",
+  "pages": [
+    "model-case",
+    "field-case",
+    "table-case",
+    "column-case",
+    "identifier",
+    "table-number",
+    "join-table",
+    "foreign-key",
+    "constraint",
+    "primary-name",
+    "no-sequential",
+    "primary-type",
+    "foreign-key-index",
+    "required-check",
+    "required-columns",
+    "column-conventions",
+    "restricted-objects",
+    "object-security",
+    "postgres-rls",
+    "zenstack-policies"
+  ]
+}

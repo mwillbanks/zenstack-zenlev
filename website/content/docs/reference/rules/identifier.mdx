@@ -1,0 +1,39 @@
+---
+title: 'Identifier conventions'
+description: 'Check physical identifier format, affixes, length, quoting, and qualification.'
+---
+
+Checks selected physical identifiers. Use `kinds` to limit a pattern to objects with the same naming convention.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/naming/identifier': [
+        'error',
+        { kinds: ['index'], format: 'snake_case', prefix: 'idx_', maxLength: 48 },
+      ],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `format` selects `PascalCase`, `camelCase`, `snake_case`, `kebab-case`, or `UPPER_SNAKE_CASE`.
+- `prefix` and `suffix` require literal affixes. `pattern` applies a JavaScript regular expression.
+- `deny` lists wildcard name patterns. `reserved` lists exact names matched without case sensitivity.
+- `maxLength` sets a positive limit. The defaults are 63 UTF-8 bytes in PostgreSQL and 64 characters in MySQL.
+- `quoted: false` requires unquoted spelling. `qualified: true` requires a schema on applicable source objects. Catalog evidence cannot establish authored quoting or qualification.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+`idx_orders_created_at` passes. Rename `orders_created_at_idx` or change the configured prefix.

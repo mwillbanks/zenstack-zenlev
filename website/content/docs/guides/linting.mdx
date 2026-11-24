@@ -1,0 +1,205 @@
+---
+title: 'Database linting'
+description: 'Check ZModel, migration SQL, and deployed database objects against configurable policy.'
+---
+
+Run database linting before you submit schema or migration changes. Zenlev ships the linter in the same package as the migration commands.
+
+```sh
+bun run zenlev lint
+bun run zenlev lint --max-warnings 0 --json
+bun run zenstack-zenlev lint
+```
+
+The offline command reads ZModel, migration source, and configured SQL files. It loads project configuration and lint rule plugins. It skips database acquisition, client-module loading, migration plugin initialization, and migration module imports.
+
+TypeScript configuration and lint rule plugins execute as trusted project code. Keep their module-level code free of external effects.
+
+## Recommended configuration
+
+Zenlev applies the `recommended` preset automatically. It requires PascalCase model names, camelCase field names, snake_case physical tables and columns, and `id` for single-column primary keys. It rejects database-generated sequential primary key values.
+
+Zenlev parses and resolves ZModel with the installed `@zenstackhq/language` parser. It inspects the resolved AST before schema migration projection. Imports, inherited fields, relations, and physical mappings use ZenStack's own resolution.
+
+```prisma
+model OrderLine {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("order_line")
+}
+```
+
+The model and field names follow ZenStack conventions. The mapping attributes establish the physical snake_case names. Findings point to a mapping attribute when present, or to the declaration that needs one. Relation and computed fields receive logical naming checks. Physical column rules apply to stored fields.
+
+UUIDs, CUIDs, and application-assigned keys remain valid. Plural table names, join shapes, UUID database types, timestamps, stored-object restrictions, and access policies are configurable.
+
+```ts
+import { defineConfig, recommendedLintConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    ...recommendedLintConfig,
+    sql: ['database/**/*.sql'],
+    rules: {
+      ...recommendedLintConfig.rules,
+      'zenlev/naming/table-number': ['error', { form: 'plural' }],
+      'zenlev/objects/restricted': [
+        'error',
+        { kinds: ['function', 'procedure'], actions: ['create', 'replace'] },
+      ],
+    },
+  },
+})
+```
+
+This rule permits cleanup drops while rejecting new routines. Use `presets: []` to start with an explicit rule set. The built-in `naming`, `objects`, and `access` presets provide opt-in policy groups.
+
+## Configure a standalone Kysely project
+
+Disable ZModel discovery and declare the SQL dialect for a SQL-only project.
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    zmodel: false,
+    dialect: 'postgresql',
+    sql: ['database/**/*.sql'],
+  },
+})
+```
+
+Offline lint uses Oxc to read both `up` and `down` migration handlers. It projects supported Kysely schema builders directly into lint evidence, and parses static SQL strings and Kysely SQL templates with bound values. Dynamic SQL, dynamic module imports, unresolved helper effects, and opaque procedural bodies produce coverage warnings. Plain SQL and unescaped TypeScript literals can point to the SQL token. Escaped strings, interpolated templates, and Kysely builders point to the enclosing source expression. PostgreSQL source signatures use authored argument text where available. Live signatures use catalog input types. Source call rules recognize explicit `CALL` and qualified calls in supported SQL queries. Unqualified function calls can produce unresolved-identity warnings. Function overload selection can depend on runtime argument types.
+
+## Install a parser for SQL text and SQLite catalogs
+
+Install an optional peer for authored SQL text and SQLite catalog parsing of stored table definitions. Zenlev loads that parser when SQL text analysis first needs it. Structured ZModel, supported Kysely schema builders, and generated statement evidence do not need a SQL parser peer. A SQLite catalog audit during `db push` still attempts to parse each stored table definition that exists.
+
+| Dialect    | Parser peer      | Install with Bun                   |
+| ---------- | ---------------- | ---------------------------------- |
+| PostgreSQL | `libpg-query`    | `bun add --dev libpg-query@18`     |
+| MySQL      | `dt-sql-parser`  | `bun add --dev dt-sql-parser@4`    |
+| SQLite     | `sqlite3-parser` | `bun add --dev sqlite3-parser@0.7` |
+
+Use regular dependencies when migrations or schema push run in a deployment that omits dev dependencies. PostgreSQL uses its native grammar through WebAssembly. MySQL uses the MySQL grammar from dt-sql-parser. SQLite uses the published SQLite grammar. These parsers validate authored SQL syntax and provide statement boundaries. Oxc parses TypeScript migration source and ZenStack parses ZModel. Static migration analysis projects supported Kysely schema builders directly into normalized lint nodes. Schema push carries structured evidence alongside each generated SQL statement, in execution order. The SQL remains available to existing hooks unchanged.
+
+A missing SQL parser produces a coverage warning when an input requires SQL text parsing, such as a `.sql` file or raw SQL in a migration. SQLite catalog checks read available metadata, including PRAGMA results, and attempt to parse every stored table definition that exists to recover facts metadata does not expose, such as named `CHECK` constraints. Without the SQLite parser, those definitions produce parse coverage gaps while metadata-based checks continue. If a table has no stored definition, only rule-specific facts that depend on that definition are unavailable. ZModel-only lint, supported Kysely builder analysis, and generated schema push evidence need no SQL parser. Set `lint.dialect` for standalone Kysely projects so builder details use the project's dialect.
+
+- [PostgreSQL parser](https://github.com/constructive-io/libpg-query-node)
+- [MySQL parser](https://github.com/DTStack/dt-sql-parser)
+- [SQLite parser](https://github.com/justjake/sqlite3-parser-js)
+- [Oxc parser](https://oxc.rs/docs/guide/usage/parser)
+
+## Enforce policy before writes
+
+Register the supplied migration plugin to check the final write plan.
+
+```ts
+import { defineConfig, lintPlugin } from '@mwillbanks/zenstack-zenlev'
+import { db } from './db'
+
+export default defineConfig({
+  client: db,
+  plugins: [lintPlugin()],
+  lint: {
+    rules: {
+      'zenlev/objects/restricted': [
+        'error',
+        { kinds: ['function', 'procedure'], actions: ['create', 'replace'] },
+      ],
+    },
+  },
+})
+```
+
+The plugin uses the same lint settings as the standalone command. It checks the locked, validated apply plan after plan transformations. Generated rollback migrations include the original `down` handlers in execution order. Schema push checks the recomputed, confirmed SQL, per-statement structured evidence, and affected desired definitions. Diagnostics backed by generated statement evidence point to the start of the corresponding generated statement and use its SQL hash. ZModel diagnostics retain their ZModel source locations. Existing exceptions based on a previous generated-statement range may need to be refreshed.
+
+An error rejects the entire plan before migration handlers or push SQL execute. Coverage warnings permit the write. Require `lint --max-warnings 0` in pull request checks when all warnings need review.
+
+The existing lock path can initialize Zenlev's internal ledger before a lint rejection. Dry runs, plan-only commands, SQL previews, and migration generation stay outside write enforcement. Static analysis reports supported effects. Review arbitrary migration code and external effects separately.
+
+## Audit deployed objects
+
+Run the catalog audit with your configured environment connection.
+
+```sh
+bun run zenlev lint --live --env staging --json
+```
+
+Use an account with the metadata permissions needed for the selected schemas. The audit reads metadata and excludes Zenlev's configured ledger objects. PostgreSQL event triggers are database-wide and can appear in a namespace-scoped audit. Supplied connections remain caller-owned. Factory-owned connections close after the audit.
+
+| Evidence                                    | PostgreSQL                                                                           | MySQL                                       | SQLite                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------- | -------------------------------------------------------- |
+| Tables, columns, keys, indexes, constraints | Catalog readers                                                                      | Information schema                          | Schema catalog and pragmas                               |
+| Stored objects                              | Routines, views, materialized views, triggers, event triggers, sequences, extensions | Routines, views, triggers, scheduled events | Persisted views and triggers                             |
+| Native RLS                                  | Table flags and policies                                                             | Capability unavailable                      | Capability unavailable                                   |
+| Authored quoting and explicit names         | Source evidence                                                                      | Source evidence                             | Source evidence                                          |
+| Application-defined functions               | Connection behavior needs separate review                                            | Connection behavior needs separate review   | Connection functions and extensions need separate review |
+
+Capabilities describe each input's coverage, including object kinds and attributes such as `column:default` and `policy:with-check`. Missing permissions or unavailable metadata produce coverage gaps. MySQL can hide metadata based on privileges. Catalog names cannot recover original identifier spelling or prove whether a constraint was explicitly named.
+
+A custom `lint.catalog` provider can normalize another adapter's metadata into `LintInput`. Declare its dialect and expose the supported capabilities.
+
+## Access-policy checks
+
+Scope PostgreSQL RLS checks to the intended tables and roles.
+
+```ts
+lint: {
+  rules: {
+    'zenlev/postgres/rls': [
+      'error',
+      {
+        tables: ['public.accounts'],
+        enabled: true,
+        force: true,
+        explicitWriteCheck: true,
+        noBroad: true,
+        allowedRoles: ['application'],
+        roles: ['application'],
+        commands: ['select', 'insert', 'update', 'delete'],
+      },
+    ],
+    'zenlev/zenstack/policies': [
+      'error',
+      { commands: ['create', 'read', 'update', 'delete'], postUpdate: true, noBroad: true },
+    ],
+  },
+}
+```
+
+PostgreSQL allows `UPDATE` and `ALL` policies to inherit `USING` for writes when `WITH CHECK` is absent. The explicit-write-check option enforces a stricter declaration convention. Set `defaultDeny: true` when denying all access is intentional. Table `CHECK` constraints and RLS `WITH CHECK` clauses have separate rules.
+
+ZenStack policies run through application queries. V3 requires explicit `post-update` rules when that operation needs protection. Relation delegation through `check()` can be valid.
+
+Role ownership, grants, membership, bypass privileges, and expression semantics affect access. Test tenant isolation with representative application roles on a disposable database.
+
+## Adopt existing databases
+
+Use ordered overrides to scope settings by source, dialect, object kind, origin, or identity.
+
+```ts
+lint: {
+  overrides: [
+    {
+      files: ['migrations/legacy/**'],
+      rules: { 'zenlev/keys/no-sequential': 'warn' },
+    },
+  ],
+  exceptions: [
+    {
+      ruleId: 'zenlev/naming/table-case',
+      identity: 'public.LegacyAccount',
+      reason: 'Keep the vendor-owned table name until its replacement is deployed.',
+    },
+  ],
+}
+```
+
+Copy an exact identity or source fingerprint from a diagnostic. Exceptions require a reason. Source fingerprints reopen review when source changes. Reports include suppressed counts and stale exceptions.
+
+Use rule errors for proven violations. Review coverage gaps before claiming full policy compliance. Exit code `0` means the configured checks passed. Exit code `1` means a policy error or warning budget failed. Exit code `2` means configuration, input, plugin, or audit execution failed.
+
+See the [lint rule reference](./reference/lint-rules), [configuration reference](./reference/configuration), and [plugin API](./reference/plugins-telemetry).

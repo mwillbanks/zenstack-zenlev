@@ -1,5 +1,6 @@
 import type { Kysely } from 'kysely'
-import type { ZenlevPlugin } from './plugins'
+import type { WriteDiagnostic, ZenlevPlugin } from './plugins'
+import type { LintConfig } from './lint/types'
 
 export type Dialect = 'sqlite' | 'postgresql' | 'mysql'
 export type HashAlgorithm = 'sha256' | 'sha512' | 'sha1' | 'md5'
@@ -114,6 +115,7 @@ export interface StoreConfig {
 
 export interface ZenlevSettings {
   readonly plugins?: readonly ZenlevPlugin<any>[]
+  readonly lint?: LintConfig
   readonly onWarning?: (warning: Warning) => void
   readonly cwd?: string
   readonly env?: string
@@ -199,4 +201,5 @@ export interface ApplyResult {
   readonly plan: Plan
   readonly migrations: readonly MigrationResult[]
   readonly status: 'planned' | 'ok' | 'failed' | 'partial'
+  readonly diagnostics?: readonly WriteDiagnostic[]
 }

@@ -4,9 +4,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Kysely } from 'kysely'
 import { createKyselyAdapter, createZenlev, type Warning, type Zenlev } from '../../src'
-import { createBunSqliteDialect } from '../fixtures/bun-sqlite'
-import { readCatalog } from '../../src/schema-catalog'
-import { loadSchemaModel } from '../../src/schema-model'
+import { createBunSqliteDialect } from '../fixtures/sqlite'
+import { readCatalog } from '../../src/schema/catalog'
+import { loadSchemaModel } from '../../src/schema/model'
 
 const sqlite = 'datasource db { provider = "sqlite" }\n'
 const current =
@@ -171,13 +171,19 @@ test('reads SQLite constraints and reports catalog objects that require manual m
       num DECIMAL DEFAULT (40.5),
       expression TEXT DEFAULT (lower('DEFAULT'))
     );
+    CREATE TABLE composite (left_id INTEGER, right_id INTEGER, PRIMARY KEY(right_id, left_id));
     CREATE TABLE generated (id INTEGER PRIMARY KEY, amount INT, doubled INT
       GENERATED ALWAYS AS (amount * 2) STORED, CHECK (amount > 0));
     CREATE INDEX ordered_code ON parent(code DESC) WHERE code IS NOT NULL;
+    CREATE INDEX collated_code ON parent(code COLLATE NOCASE);
     CREATE VIEW enabled AS SELECT id FROM parent;
   `)
   const target = await loadSchemaModel({ cwd })
   const live = await readCatalog(db, target, [], false)
+  expect(live.tables.find(({ name }) => name === 'composite')?.primaryKey).toEqual([
+    'right_id',
+    'left_id',
+  ])
   const details = live.tables.find(({ name }) => name === 'details')!
   expect(details.foreignKeys).toEqual(
     expect.arrayContaining([
@@ -206,9 +212,72 @@ test('reads SQLite constraints and reports catalog objects that require manual m
     'implicit SQLite foreign key',
   )
   expect(live.unsupported.map(({ message }) => message).join('\n')).toContain('generated columns')
-  expect(live.unsupported.map(({ message }) => message).join('\n')).toContain(
-    'ordered, or collated index',
+  expect(live.unsupported.map(({ message }) => message).join('\n')).toMatch(
+    /ordered, or collated index collated_code/,
   )
+})
+
+test('ignores SQLite quoted keywords and comments and normalizes hexadecimal defaults', async () => {
+  await Bun.write(
+    resolve(cwd, 'schema.zmodel'),
+    sqlite +
+      `
+model Quoted {
+  id Int @id
+  label String @default("AUTOINCREMENT COLLATE NOCASE CHECK (x) WITHOUT ROWID DEFERRABLE")
+  value Int @default(42)
+  @@map("AUTOINCREMENT")
+}
+model ActualAuto {
+  id Int @id @default(autoincrement())
+  @@map("actual_auto")
+}
+`,
+  )
+  raw.exec(`
+    CREATE TABLE "AUTOINCREMENT" (
+      id INTEGER NOT NULL PRIMARY KEY,
+      label TEXT NOT NULL DEFAULT 'AUTOINCREMENT COLLATE NOCASE CHECK (x) WITHOUT ROWID DEFERRABLE',
+      value INTEGER NOT NULL DEFAULT 0x2a
+      /* AUTOINCREMENT CHECK (x) DEFERRABLE */
+      -- COLLATE NOCASE
+    );
+    CREATE TABLE actual_auto (id INTEGER PRIMARY KEY AUTOINCREMENT);
+  `)
+  const desired = await loadSchemaModel({ cwd })
+  const live = await readCatalog(db, desired, [])
+  expect(live.unsupported).toEqual([])
+  expect(live.tables.find(({ name }) => name === 'AUTOINCREMENT')?.columns[0]?.autoIncrement).toBe(
+    false,
+  )
+  expect(live.tables.find(({ name }) => name === 'actual_auto')?.columns[0]?.autoIncrement).toBe(
+    true,
+  )
+  expect((await zenlev.db.push({ dryRun: true })).changes.operations).toEqual([])
+})
+
+test('blocks SQLite deferred foreign keys absent from PRAGMA metadata', async () => {
+  raw.exec(`
+    CREATE TABLE parent (id INTEGER PRIMARY KEY);
+    CREATE TABLE child (
+      id INTEGER PRIMARY KEY,
+      parent_id INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE immediate (
+      id INTEGER PRIMARY KEY,
+      parent_id INTEGER REFERENCES parent(id) NOT DEFERRABLE INITIALLY IMMEDIATE
+    );
+  `)
+  const desired = await loadSchemaModel({ cwd })
+  const live = await readCatalog(db, desired, [])
+  expect(live.unsupported.map(({ message }) => message)).toEqual([
+    expect.stringContaining(
+      'child has SQLite constraints or storage features outside the diff model',
+    ),
+  ])
+  expect(
+    (await zenlev.db.push({ dryRun: true })).changes.blockers.map(({ code }) => code),
+  ).toContain('UNSUPPORTED_CATALOG_OBJECT')
 })
 
 test('rolls direct SQLite DDL back when the second statement fails', async () => {

@@ -4,7 +4,7 @@
 
 <h1 align="center">Zenlev</h1>
 
-<p align="center">TypeScript database migrations for ZenStack V3 and Kysely.</p>
+<p align="center">TypeScript database migrations and linting for ZenStack V3 and Kysely.</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@mwillbanks/zenstack-zenlev"><img src="https://img.shields.io/npm/v/@mwillbanks/zenstack-zenlev" alt="npm version" /></a>
@@ -35,6 +35,7 @@ Declare that backfill depends on expansion and removal depends on backfill. A na
 
 ### What you can do
 
+- **Check database conventions.** Lint ZModel mappings, migration SQL, primary keys, and configured database policies. Audit deployed catalogs or register `lintPlugin()` to check writes. [Database linting](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/linting)
 - **Plan before applying.** Preview the selected migrations and their blockers. Filter by IDs, graph bounds, namespaces, or tags. Export a dependency tree for review. [Dependency graph](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/graph)
 - **Write and audit TypeScript migrations.** Use the configured ZenStack client or Kysely in migration handlers. The ledger records the executed entry-file hash and exposes unexpected edits. [Migration authoring](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/migrations)
 - **Review ZModel changes as SQL.** Compare against a live database or a previous schema. Preview SQL or generate a migration and decide explicitly which absent-model tables to drop. Keep using `zen db pull` for introspection. [Schema changes](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/schema-changes)
@@ -76,7 +77,7 @@ Keep the generated metadata in `migrations/`. Replace the empty `up` handler wit
 export async function up(ctx: MigrationCtx) {
   await ctx.db.schema
     .createTable('accounts')
-    .addColumn('id', 'integer', (column) => column.primaryKey())
+    .addColumn('id', 'varchar(36)', (column) => column.primaryKey())
     .addColumn('name', 'varchar(255)', (column) => column.notNull())
     .execute()
 }
@@ -92,7 +93,15 @@ bun run zenlev migrate status
 
 The CLI also runs as `zenstack-zenlev`. Add `--json` for automation. [First migration walkthrough](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/quick-start) · [CLI reference](https://mwillbanks.github.io/zenstack-zenlev/docs/reference/commands)
 
-### 4. Install agent guidance
+### 4. Lint database changes
+
+```sh
+bun run zenlev lint --max-warnings 0
+```
+
+Zenlev applies its recommended naming and primary-key rules. Configure project conventions under `lint`. Install the optional parser peer for authored SQL files, raw migration SQL, and SQLite catalog parsing of stored table definitions: `libpg-query@18` for PostgreSQL, `dt-sql-parser@4` for MySQL, or `sqlite3-parser@0.7` for SQLite. SQLite catalog lint attempts to parse each stored table definition that exists, regardless of configured rules. Without the SQLite parser, parse coverage gaps are reported while checks supported by available metadata, including PRAGMA results, continue. If a table has no stored definition, only rule-specific facts that depend on it are unavailable. Supported Kysely builders and generated statement evidence use structured linting without a SQL parser peer. A SQLite catalog audit during `db push` still attempts to parse each stored table definition that exists. Register `plugins: [lintPlugin()]` to enforce lint during apply and schema push. [Lint configuration and plugins](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/linting)
+
+### 5. Install agent guidance
 
 Install TanStack Intent as a development dependency.
 
@@ -115,7 +124,7 @@ bun run intent list
 bun run intent load '@mwillbanks/zenstack-zenlev#zenlev-setup'
 ```
 
-Use a Zenlev release that includes `skills/`. Intent loads guidance from the installed version. The six skills cover setup, migration authoring, deployment planning, schema diffing, plugin authoring, and recovery. [Agent Skills installation and allowlist examples](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/agent-skills)
+Use a Zenlev release that includes `skills/`. Intent loads guidance from the installed version. The seven skills cover setup, database linting, migration authoring, deployment planning, schema diffing, plugin authoring, and recovery. [Agent Skills installation and allowlist examples](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/agent-skills)
 
 ## Moving from Prisma Migrate
 

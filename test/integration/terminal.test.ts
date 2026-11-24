@@ -47,7 +47,7 @@ test('renders a status result through a genuine PTY and restores confirmation af
       `
 import { Database } from 'bun:sqlite'
 import { Kysely } from 'kysely'
-import { createBunSqliteDialect } from '../fixtures/bun-sqlite'
+import { createBunSqliteDialect } from '../fixtures/sqlite'
 import { createKyselyAdapter } from '../../src'
 const db = new Kysely({ dialect: createBunSqliteDialect(new Database(':memory:')) })
 export default { adapter: createKyselyAdapter(db, 'sqlite') }

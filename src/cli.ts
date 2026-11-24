@@ -3,14 +3,17 @@ import { parseArgs, type ParseArgsConfig } from 'node:util'
 import { createInterface } from 'node:readline/promises'
 import { version as packageVersion } from '../package.json'
 import { createZenlev, type Zenlev } from './engine'
+import { lintProject } from './lint'
+import type { LintResult } from './lint/types'
+import type { WriteDiagnostic } from './plugins'
 import type { ApplyOptions, ApplyResult, ZenlevConfig, ZenlevSettings } from './types'
-import type { PushResult } from './schema-commands'
-import type { StatusEntry } from './inspection'
-import type { CreateOptions, RemoveOptions, StatusOptions, TreeOptions } from './inspection'
-import type { RollbackOptions } from './rollback'
-import type { SquashOptions } from './baseline'
-import type { ResolveOptions, ReshapeOptions } from './execution'
-import type { RecoveryOptions } from './store'
+import type { PushResult } from './schema/commands'
+import type { StatusEntry } from './migrate/inspection'
+import type { CreateOptions, RemoveOptions, StatusOptions, TreeOptions } from './migrate/inspection'
+import type { RollbackOptions } from './migrate/rollback'
+import type { SquashOptions } from './migrate/baseline'
+import type { ResolveOptions, ReshapeOptions } from './migrate/execution'
+import type { RecoveryOptions } from './migrate/store'
 
 const globalStrings = [
   'config',
@@ -30,6 +33,7 @@ const globalStrings = [
 ]
 const globalBooleans = ['json', 'hash-normalize-line-endings', 'otel']
 const commandFlags = {
+  lint: ['live', 'max-warnings'],
   'db push': [
     'dry-run',
     'sql',
@@ -95,6 +99,7 @@ const stringFlags = new Set([
   'attempt-id',
   'evidence',
   'snapshot',
+  'max-warnings',
 ])
 const camel = (name: string) =>
   name.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
@@ -244,6 +249,7 @@ export function parseCli(args: readonly string[]): CliInvocation {
 export const helpText = `Usage: zenlev <command> [options]
 
 Commands
+  lint [--live] [--max-warnings <n>]
   db push
   migrate create | apply | rollback | status | tree | remove | reshape | resolve | recover | squash
 
@@ -268,6 +274,38 @@ export interface CliDependencies {
   readonly tty?: boolean
   readonly confirm?: (question: string) => boolean | Promise<boolean>
   readonly render?: (text: string, write: (text: string) => void | Promise<void>) => Promise<void>
+}
+
+function diagnosticLine(diagnostic: WriteDiagnostic): string {
+  const { source, identity, ruleId, severity, message } = diagnostic
+  const target = source ? [source.path, source.line, source.column].join(':') : identity
+  return [target, severity, ruleId, message].filter(Boolean).join(' · ')
+}
+
+function lintSummary(result: LintResult): string {
+  return [
+    ...result.diagnostics.map(diagnosticLine),
+    ...result.coverage.gaps.map((gap) =>
+      diagnosticLine({
+        ...gap,
+        ruleId: 'zenlev/coverage',
+        severity: 'warn',
+      }),
+    ),
+    ...result.staleExceptions.map(
+      (entry) =>
+        'Stale exception · ' + entry.ruleId + ' · ' + (entry.identity ?? entry.fingerprint),
+    ),
+    'Database lint · ' +
+      result.status +
+      ' · ' +
+      result.diagnostics.length +
+      ' findings · ' +
+      result.coverage.gaps.length +
+      ' coverage gaps · ' +
+      result.suppressed +
+      ' suppressed',
+  ].join('\n')
 }
 
 async function confirm(question: string): Promise<boolean> {
@@ -308,6 +346,7 @@ function human(parsed: CliInvocation, result: unknown): string {
       'Schema push · ' + push.status,
       ...(push.error ? [push.error] : []),
       ...details,
+      ...(push.diagnostics ?? []).map(diagnosticLine),
       ...statements,
       ...(push.migration ? [push.migration.filePath] : []),
     ].join('\n')
@@ -330,6 +369,7 @@ function human(parsed: CliInvocation, result: unknown): string {
       'Migration apply · ' + apply.status,
       ...apply.plan.blockers.map(({ message }) => 'Blocked · ' + message),
       ...apply.plan.warnings.map(({ message }) => 'Warning · ' + message),
+      ...(apply.diagnostics ?? []).map(diagnosticLine),
       ...(apply.status === 'planned'
         ? apply.plan.migrations.map(({ id, name }) => id + ' · ' + name)
         : apply.migrations.map(({ id, status, error }) =>
@@ -437,6 +477,25 @@ export async function runCli(
       )
       return 0
     }
+    if (parsed.command === 'lint') {
+      const value = parsed.options.maxWarnings
+      if (value !== undefined && (typeof value !== 'string' || !/^\d+$/.test(value)))
+        throw new TypeError('--max-warnings requires a nonnegative integer')
+      const result = await lintProject(
+        parsed.config,
+        {
+          live: parsed.options.live === true,
+          ...(value === undefined ? {} : { maxWarnings: Number(value) }),
+        },
+        parsed.configPath,
+      )
+      await stdout(
+        (parsed.json
+          ? JSON.stringify({ status: result.status === 'failed' ? 'error' : 'ok', result })
+          : lintSummary(result)) + '\n',
+      )
+      return result.status === 'failed' ? 1 : 0
+    }
     client = await (dependencies.create ?? createZenlev)(
       {
         ...parsed.config,
@@ -459,7 +518,7 @@ export async function runCli(
         JSON.stringify({ status: failed(result) ? 'error' : 'ok', result: result ?? null }) + '\n',
       )
     else if (tty && !parsed.options.sql) {
-      const render = dependencies.render ?? (await import('./cli-render')).renderTerminal
+      const render = dependencies.render ?? (await import('./cli/render')).renderTerminal
       await render(human(parsed, result), stdout)
     } else await stdout(human(parsed, result) + '\n')
     return failed(result) ? 1 : 0
@@ -477,7 +536,7 @@ export async function runCli(
     const json = parsed?.json ?? args.includes('--json')
     if (json) await stdout(JSON.stringify({ status: 'error', error: { message } }) + '\n')
     else await stderr(message + '\n')
-    return 1
+    return (parsed?.command ?? commandHint(args)) === 'lint' ? 2 : 1
   }
 }
 

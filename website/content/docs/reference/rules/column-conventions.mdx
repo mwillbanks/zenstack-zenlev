@@ -1,0 +1,34 @@
+---
+title: 'Column conventions'
+description: 'Set column prefixes, suffixes, and accepted types for selected fields.'
+---
+
+Use type filters or identities for business conventions such as Boolean prefixes and JSON suffixes.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/columns/conventions': ['error', { types: ['boolean'], prefixes: ['is_', 'has_'] }],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `types` filters eligible columns by exact normalized type name.
+- `prefixes` permits any listed prefix. `suffix` requires a suffix. `forbiddenSuffixes` rejects any listed suffix.
+- `allowedTypes` defines which exact normalized types the selected columns may use.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+`is_archived boolean` passes. Rename an `archived boolean` column to `is_archived` and preserve application field names through mapping if needed.

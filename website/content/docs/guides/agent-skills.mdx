@@ -3,7 +3,7 @@ title: Agent skills
 description: Load task-focused Zenlev guidance from your installed package with TanStack Intent, explicit permissions, and version review.
 ---
 
-Zenlev ships six Agent Skills with its npm package. Each skill explains a specific migration task and its decision points. TanStack Intent discovers that guidance from your installed dependency, so the instructions travel with the library version you use.
+Zenlev ships seven Agent Skills with its npm package. Each skill explains a migration or database lint task and its decision points. TanStack Intent discovers that guidance from your installed dependency, so the instructions travel with the library version you use.
 
 Skills help an agent reason about the graph and database state. They do not grant permission to run migrations or replace your deployment controls.
 
@@ -36,6 +36,7 @@ Merge this policy into your project's `package.json` before discovery. Exact ide
   "intent": {
     "skills": [
       "@mwillbanks/zenstack-zenlev#zenlev-setup",
+      "@mwillbanks/zenstack-zenlev#zenlev-linting",
       "@mwillbanks/zenstack-zenlev#zenlev-migration-authoring",
       "@mwillbanks/zenstack-zenlev#zenlev-deployment-planning",
       "@mwillbanks/zenstack-zenlev#zenlev-schema-diff",
@@ -46,14 +47,15 @@ Merge this policy into your project's `package.json` before discovery. Exact ide
 }
 ```
 
-| Skill                        | Load it for                                                                    |
-| ---------------------------- | ------------------------------------------------------------------------------ |
-| `zenlev-setup`               | Client ownership, environment factories, standalone Kysely, and dialect setup. |
-| `zenlev-migration-authoring` | Metadata, dependencies, hashes, transaction scope, and reversible changes.     |
-| `zenlev-deployment-planning` | Namespace stages, cross-stage blockers, filters, and supersedes.               |
-| `zenlev-schema-diff`         | Comparison direction, SQL review, and missing-table decisions.                 |
-| `zenlev-plugin-authoring`    | Typed context, lifecycle hooks, execution policy, and audit observers.         |
-| `zenlev-recovery`            | Cascade, compensation, abandoned locks, interrupted attempts, and baselines.   |
+| Skill                        | Load it for                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| `zenlev-setup`               | Client ownership, environment factories, standalone Kysely, and dialect setup.             |
+| `zenlev-linting`             | Offline lint, live audits, rule selection, review of coverage gaps, and write enforcement. |
+| `zenlev-migration-authoring` | Metadata, dependencies, hashes, transaction scope, and reversible changes.                 |
+| `zenlev-deployment-planning` | Namespace stages, cross-stage blockers, filters, and supersedes.                           |
+| `zenlev-schema-diff`         | Comparison direction, SQL review, and missing-table decisions.                             |
+| `zenlev-plugin-authoring`    | Typed context, lifecycle hooks, execution policy, and audit observers.                     |
+| `zenlev-recovery`            | Cascade, compensation, abandoned locks, interrupted attempts, and baselines.               |
 
 An exclusion overrides an allowlist entry. For example, this project permits deployment planning but withholds recovery guidance:
 

@@ -1,6 +1,6 @@
 ---
 name: zenlev-setup
-description: Use when wiring Zenlev into a Bun project, choosing a ZenStack V3 client, factory, or standalone Kysely adapter, or diagnosing why --env points at the wrong database. Covers connection ownership, project paths, dialect setup, and destination checks.
+description: Use when wiring Zenlev into a Bun project, choosing a ZenStack V3 client, factory, or standalone Kysely adapter, or diagnosing why --env points at the wrong database. Covers connection ownership, project paths, dialect setup, destination checks, and database lint setup.
 license: MIT
 compatibility: Requires Bun and an installed Zenlev package.
 metadata:
@@ -10,8 +10,17 @@ metadata:
     website/content/docs/reference/configuration.mdx
     website/content/docs/reference/api.mdx
     website/content/docs/guides/namespaces.mdx
+    website/content/docs/guides/linting.mdx
     src/database.ts
-    src/project-config.ts
+    src/config.ts
+    src/lint/source/kysely.ts
+    src/lint/source/sql.ts
+    src/lint/plugin.ts
+    src/lint/sqlite/catalog.ts
+    src/lint/mysql/parser.ts
+    src/lint/postgresql/parser.ts
+    src/lint/sqlite/parser.ts
+    src/schema/diff/evidence.ts
     src/types.ts
 ---
 
@@ -39,9 +48,19 @@ Keep a stable ledger location for each destination. SQLite uses prefixed tables;
 
 Namespace labels group migrations within one ledger. They do not isolate databases or route connections. Confirm the factory destination separately.
 
-Completion evidence: identify the selected destination, connection owner, ledger location, and plan result. A successful plan can still contain blockers; inspect them before execution.
+## Set up database linting
+
+1. Run `bun run zenlev lint --json` from the application directory. Zenlev applies its recommended ZModel mapping and primary-key rules by default.
+2. For standalone SQL or Kysely, set `lint.zmodel: false` and `lint.dialect`. Set `lint.sql` to the SQL file globs you want to check.
+3. Install an optional parser peer for authored SQL files, raw migration SQL, and SQLite catalog parsing of stored table definitions. Use `libpg-query@18` for PostgreSQL, `dt-sql-parser@4` for MySQL, or `sqlite3-parser@0.7` for SQLite. SQLite catalog lint attempts to parse each stored table definition that exists, regardless of configured rules. Without the SQLite parser, report parse coverage gaps and continue checks supported by available metadata, including PRAGMA results. If a table has no stored definition, only rule-specific facts that depend on it are unavailable. Supported Kysely builders and generated statement evidence use structured linting without a parser peer. A SQLite catalog audit during `db push` still attempts to parse each stored table definition that exists.
+4. Use regular dependencies if a deployment environment runs lint or write enforcement without dev dependencies.
+5. Add `bun run zenlev lint --max-warnings 0` to CI. Use `plugins: [lintPlugin()]` to enforce lint on migration apply and schema push.
+6. Load `zenlev-linting` for rule selection, coverage diagnostics, exceptions, and live audit steps.
+
+Identify the destination, connection owner, ledger location, plan result, and offline lint result. Review any plan blockers before execution.
 
 - [Configuration and ownership](https://mwillbanks.github.io/zenstack-zenlev/docs/reference/configuration)
 - [API and Kysely adapter](https://mwillbanks.github.io/zenstack-zenlev/docs/reference/api)
 - [Dialect examples](https://mwillbanks.github.io/zenstack-zenlev/docs/dialects)
 - [Namespaces and environments](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/namespaces)
+- [Database linting](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/linting)

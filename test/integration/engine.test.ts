@@ -12,8 +12,8 @@ import {
   type Warning,
   type Zenlev,
 } from '../../src'
-import { createStore } from '../../src/store'
-import { createBunSqliteDialect } from '../fixtures/bun-sqlite'
+import { createStore } from '../../src/migrate/store'
+import { createBunSqliteDialect } from '../fixtures/sqlite'
 
 let cwd: string
 let raw: Database

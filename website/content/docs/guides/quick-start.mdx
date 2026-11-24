@@ -49,7 +49,7 @@ import type { MigrationCtx } from '@mwillbanks/zenstack-zenlev'
 export async function up(ctx: MigrationCtx) {
   await ctx.db.schema
     .createTable('categories')
-    .addColumn('id', 'integer', (column) => column.primaryKey())
+    .addColumn('id', 'varchar(36)', (column) => column.primaryKey().notNull())
     .addColumn('name', 'text', (column) => column.notNull())
     .execute()
 }
@@ -58,6 +58,8 @@ export async function down(ctx: MigrationCtx) {
   await ctx.db.schema.dropTable('categories').execute()
 }
 ```
+
+Assign each category ID in the application, for example with `crypto.randomUUID()`.
 
 Keep the generated `meta` export in the same file. Its namespace labels when you intend to run the migration. The deployment pipeline chooses that time explicitly.
 

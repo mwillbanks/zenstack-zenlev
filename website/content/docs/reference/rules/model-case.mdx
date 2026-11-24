@@ -1,0 +1,32 @@
+---
+title: 'Model case'
+description: 'Require PascalCase ZModel model names by default.'
+---
+
+Checks logical ZModel model names. The model name and the mapped table name have independent rules.
+
+The recommended preset enables this rule at `error`. Configure it explicitly to change the parameters or severity.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/naming/model-case': ['error', { format: 'PascalCase' }],
+    },
+  },
+})
+```
+
+## Parameters
+
+`format` selects `PascalCase` (default), `camelCase`, `snake_case`, `kebab-case`, or `UPPER_SNAKE_CASE`.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+`model OrderLine` passes this check. A model called `order_line` needs a logical rename. Keep the database table name with `@@map("order_line")`.

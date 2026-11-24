@@ -55,6 +55,23 @@ Rollback uses `mode: 'cascade' | 'compensate'`. See [Rollback and recovery](./gu
 
 Apply returns `status: 'planned' | 'ok' | 'failed' | 'partial'`. Inspect `plan.blockers`, `plan.warnings`, and `migrations` before advancing the deployment.
 
+## Database linting
+
+```ts
+import { lintProject } from '@mwillbanks/zenstack-zenlev'
+
+const result = await lintProject(
+  { lint: { zmodel: false, dialect: 'postgresql', sql: ['database/**/*.sql'] } },
+  { maxWarnings: 0 },
+)
+```
+
+`lintProject(config?, options?, configPath?)` runs the same checks as the lint command. Options accept `live` and `maxWarnings`. The result includes `status`, `diagnostics`, `coverage`, `suppressed`, `staleExceptions`, and the file count. Diagnostics contain stable rule IDs and source locations or qualified catalog identities.
+
+Exported `recommendedLintConfig` provides the default naming and primary-key settings. Exported `lintPlugin()` returns a standard Zenlev lifecycle plugin for the project's `plugins` array. Apply and push results can contain structured write diagnostics. Error diagnostics reject the final write plan.
+
+Use `testLintRule(rule, input, options?)` to exercise custom rules against normalized database evidence. The package exports the lint configuration, visitor, rule, evidence, catalog-provider, and result types. See [Lint rules](./reference/lint-rules).
+
 ## Typed migrations
 
 Use `zenlev.defineMigration` with your configured service to infer its client and plugin context.
@@ -71,7 +88,7 @@ export const migration = zenlev.defineMigration({
     ctx.reporter.info('Preparing release')
     await ctx.db.schema
       .createTable('release_marker')
-      .addColumn('id', 'integer', (column) => column.primaryKey())
+      .addColumn('id', 'varchar(36)', (column) => column.primaryKey())
       .execute()
   },
 })

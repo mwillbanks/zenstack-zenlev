@@ -1,3 +1,7 @@
+import type { LintInput } from './lint/types'
+import type { ResolvedProjectConfig } from './config'
+import type { SchemaModel } from './schema/model'
+import type { DatabaseAdapter } from './types'
 import type {
   Attributes,
   Environment,
@@ -22,6 +26,48 @@ export interface CommandInfo {
   readonly name: string
   readonly args: readonly string[]
   readonly options: Attributes
+}
+
+export interface WriteDiagnostic {
+  readonly ruleId: string
+  readonly severity: 'warn' | 'error'
+  readonly message: string
+  readonly identity?: string | undefined
+  readonly source?:
+    | {
+        readonly path: string
+        readonly line: number
+        readonly column: number
+        readonly endLine?: number
+        readonly endColumn?: number
+      }
+    | undefined
+  readonly fingerprint?: string
+}
+
+export interface PlannedMigrationHandler {
+  readonly migration: Omit<MigrationIdentity, 'custom'>
+  readonly direction: 'up' | 'down'
+}
+
+export type WritePlan =
+  | { readonly command: 'migrate apply'; readonly handlers: readonly PlannedMigrationHandler[] }
+  | {
+      readonly command: 'db push'
+      readonly statements: readonly string[]
+      /** Ordered structured facts for each generated forward statement. */
+      readonly evidence?: readonly LintInput[]
+      readonly desired: SchemaModel
+      readonly affected: readonly string[]
+      readonly zmodel?: LintInput
+    }
+
+export interface WriteProject {
+  readonly config: Pick<
+    ResolvedProjectConfig,
+    'cwd' | 'schema' | 'hashing' | 'lint' | 'lintPluginBase' | 'store'
+  >
+  readonly adapter: DatabaseAdapter
 }
 
 export interface CommandResult {
@@ -53,6 +99,13 @@ export interface PluginApi<Extension extends object = object> {
     fn: (context: HookContext<Extension>, result: CommandResult) => Awaitable<void>,
   ): void
   onPlan(fn: (context: HookContext<Extension>, plan: Plan) => Awaitable<Plan | void>): void
+  onBeforeWrite(
+    fn: (
+      context: HookContext<Extension>,
+      plan: WritePlan,
+      project: WriteProject,
+    ) => Awaitable<readonly WriteDiagnostic[] | void>,
+  ): void
   onBeforeMigration(
     fn: (context: MigrationCtx<unknown, any, Extension>, migration: MigrationIdentity) => Decision,
   ): void
@@ -154,6 +207,7 @@ export async function createPlugins(plugins: readonly ZenlevPlugin<any>[]) {
     onBeforeCommand: [],
     onAfterCommand: [],
     onPlan: [],
+    onBeforeWrite: [],
     onBeforeMigration: [],
     onAfterMigration: [],
     onWarning: [],
@@ -168,6 +222,7 @@ export async function createPlugins(plugins: readonly ZenlevPlugin<any>[]) {
     onBeforeCommand: (fn) => hooks.onBeforeCommand.push(fn),
     onAfterCommand: (fn) => hooks.onAfterCommand.push(fn),
     onPlan: (fn) => hooks.onPlan.push(fn),
+    onBeforeWrite: (fn) => hooks.onBeforeWrite.push(fn),
     onBeforeMigration: (fn) => hooks.onBeforeMigration.push(fn),
     onAfterMigration: (fn) => hooks.onAfterMigration.push(fn),
     onWarning: (fn) => hooks.onWarning.push(fn),
@@ -234,6 +289,18 @@ export async function createPlugins(plugins: readonly ZenlevPlugin<any>[]) {
           if (proposed !== undefined) current = validate(proposed)
         }
         return current
+      },
+      hasBeforeWrite: hooks.onBeforeWrite.length > 0,
+      async beforeWrite(
+        plan: WritePlan,
+        project: WriteProject,
+      ): Promise<readonly WriteDiagnostic[]> {
+        const diagnostics: WriteDiagnostic[] = []
+        for (const hook of hooks.onBeforeWrite) {
+          const findings = await hook(context, structuredClone(plan), project)
+          if (findings) diagnostics.push(...findings)
+        }
+        return diagnostics
       },
       async beforeMigration(migration: MigrationCtx) {
         for (const hook of hooks.onBeforeMigration) {

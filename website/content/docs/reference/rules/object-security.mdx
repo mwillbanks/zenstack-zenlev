@@ -1,0 +1,40 @@
+---
+title: 'SQL object security'
+description: 'Check invoker or definer mode and trusted routine search paths.'
+---
+
+Uses security attributes visible in source or catalogs for applicable routines, views, triggers, and events.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/objects/security': [
+        'error',
+        {
+          kinds: ['function', 'procedure'],
+          trustedSearchPath: ['pg_catalog', 'app', 'pg_temp'],
+        },
+      ],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `security` requires `invoker` or `definer` where the attribute is available.
+- `trustedSearchPath` is an allow-list of PostgreSQL schemas. A definer routine needs an explicit, nonempty path containing only listed schemas. Verify path order and schema privileges separately.
+- `publicExecute: false` requests a coverage warning because grant and role metadata are needed to establish PUBLIC EXECUTE access.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+Use `SET search_path TO pg_catalog, app, pg_temp` for a PostgreSQL `SECURITY DEFINER` routine when only trusted roles can write to `app`. Keep `pg_temp` last. [PostgreSQL definer guidance](https://www.postgresql.org/docs/18/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY)

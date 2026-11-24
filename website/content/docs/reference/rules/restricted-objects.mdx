@@ -1,0 +1,47 @@
+---
+title: 'Restricted SQL objects'
+description: 'Prohibit selected SQL object kinds, actions, and languages.'
+---
+
+Use this rule to limit stored SQL while retaining an explicit cleanup path. The default kinds include routines, views, triggers, events, sequences, extensions, and anonymous blocks.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/objects/restricted': [
+        'error',
+        {
+          kinds: ['function', 'procedure'],
+          actions: ['create', 'replace'],
+          allow: ['reporting.approved_*'],
+        },
+      ],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `kinds` selects normalized object kinds such as `function`, `procedure`, or `view`.
+- `actions` filters actions such as `create`, `replace`, `alter`, `drop`, `call`, and `existing`. Omit it to allow drops and calls and check other actions.
+- `allow` exempts matching qualified identity patterns. Routine identities can include signatures when available.
+- `languages` limits the restriction to listed routine languages and produces a coverage gap when the language is unavailable.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+The first statement is allowed. The second statement is prohibited. Routines under `reporting` with the configured prefix are exempt.
+
+```sql
+DROP FUNCTION app.old_report();
+CREATE FUNCTION app.new_report() RETURNS integer LANGUAGE sql AS 'SELECT 1';
+```

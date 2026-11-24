@@ -1,0 +1,32 @@
+---
+title: 'No sequential primary keys'
+description: 'Reject database-generated sequential values in primary key columns.'
+---
+
+Checks every primary key member. Recognizes ZModel `autoincrement()`, PostgreSQL serial, identity and recognized sequence defaults, MySQL `AUTO_INCREMENT`, and SQLite rowid aliases.
+
+The recommended preset enables this rule at `error`. Configure it explicitly to change the parameters or severity.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/keys/no-sequential': 'error',
+    },
+  },
+})
+```
+
+## Parameters
+
+The rule has only shared selectors. Selectors match the physical column identity.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+SQLite can generate a value for `id INTEGER PRIMARY KEY` even without `AUTOINCREMENT`. An application-assigned `id TEXT PRIMARY KEY` passes. SQLite `WITHOUT ROWID` and inline `PRIMARY KEY DESC` can prevent a rowid alias.
