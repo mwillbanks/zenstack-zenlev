@@ -1,0 +1,32 @@
+---
+title: 'Column case'
+description: 'Require snake_case physical column names by default.'
+---
+
+Checks stored column names. In ZModel, it reads the effective physical name from `@map` when present.
+
+The recommended preset enables this rule at `error`. Configure it explicitly to change the parameters or severity.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/naming/column-case': ['error', { format: 'snake_case' }],
+    },
+  },
+})
+```
+
+## Parameters
+
+`format` selects `snake_case` (default), `PascalCase`, `camelCase`, `kebab-case`, or `UPPER_SNAKE_CASE`.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+Map `orderId String` with `@map("order_id")`. A SQL column authored as `orderId` also needs the `order_id` spelling.

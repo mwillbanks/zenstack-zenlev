@@ -95,6 +95,8 @@ describe('migration source inspection', () => {
     ['(class { @decorate method() {} })', '@decorate'],
     ['(class { @decorate field = deferred() })', '@decorate'],
     ['(class { constructor(@decorate value: string) {} })', '@decorate'],
+    ['(class { constructor(@decorate public value: string) {} })', '@decorate'],
+    ['(class { @decorate accessor field = deferred() })', '@decorate'],
     ['(class { method(@factory() value: string) {} })', '@factory()'],
   ])('reports eager decorator applications in %s', async (initializer, decorator) => {
     const body = 'const value = ' + initializer + '; export function up() {}'
@@ -272,6 +274,18 @@ describe('migration source inspection', () => {
     })
     expect(node(generated, 'column').source).toEqual(node(generated, 'table').source)
   })
+  test('preserves SQL source columns after non-ASCII migration text', async () => {
+    const body =
+      "import {sql} from 'kysely'; const marker = '🦊'; export async function up(ctx) { await sql.raw('CREATE TABLE users (id text PRIMARY KEY)').execute(ctx.db.kysely) }"
+    const result = await migration(body)
+    const start = body.indexOf('users') + 1
+    expect(node(result, 'table').source).toMatchObject({
+      line: 1,
+      column: start,
+      endColumn: start + 'users'.length,
+    })
+  })
+
   test('reports unresolved exported handlers and preserves optional down coverage', async () => {
     const reexported = await migration("export { helper as up } from './other';", 'sqlite', [
       'up',

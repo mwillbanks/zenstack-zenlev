@@ -1,39 +1,37 @@
-import type { CallExpression, Expression, Node } from 'typescript-ast'
+import type { CallExpression, Node } from 'oxc-parser'
 
-export const staticString = (
-  ts: typeof import('typescript-ast'),
-  node: import('typescript-ast').Node | undefined,
-): string | undefined =>
-  node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
-    ? node.text
-    : undefined
+export function staticString(node: Node | null | undefined): string | undefined {
+  if (node?.type === 'Literal' && typeof node.value === 'string') return node.value
+  if (node?.type === 'TemplateLiteral' && node.expressions.length === 0)
+    return node.quasis[0]?.value.cooked ?? undefined
+}
+
+export function memberName(node: Node | null | undefined): string | undefined {
+  if (node?.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier')
+    return node.property.name
+}
 
 export function readKyselyBuilder(
-  ts: typeof import('typescript-ast'),
   dialect: string | undefined,
-  isSql: (node: Expression) => boolean,
+  isSql: (node: Node) => boolean,
   gap: (node: Node, message: string) => void,
   addQuery: (sql: string, expression: CallExpression) => void,
 ) {
-  return (expression: import('typescript-ast').CallExpression): boolean => {
-    type Call = import('typescript-ast').CallExpression
-    const chainOf = (expression: import('typescript-ast').Expression) => {
-      const calls: Call[] = []
+  return (expression: CallExpression): boolean => {
+    const chainOf = (expression: Node) => {
+      const calls: CallExpression[] = []
       let root = expression
-      while (ts.isParenthesizedExpression(root)) root = root.expression
-      while (ts.isCallExpression(root) && ts.isPropertyAccessExpression(root.expression)) {
+      while (root.type === 'CallExpression' && root.callee.type === 'MemberExpression') {
         calls.unshift(root)
-        root = root.expression.expression
-        while (ts.isParenthesizedExpression(root)) root = root.expression
+        root = root.callee.object
       }
       return { calls, root }
     }
     const { calls: chain, root } = chainOf(expression)
-    const methodOf = (call: Call) =>
-      (call.expression as import('typescript-ast').PropertyAccessExpression).name.text
+    const methodOf = (call: CallExpression) => memberName(call.callee) ?? '<computed>'
     let schema: string | undefined
     if (chain[0] && methodOf(chain[0]) === 'withSchema') {
-      schema = staticString(ts, chain[0].arguments[0])
+      schema = staticString(chain[0].arguments[0])
       if (!schema) {
         gap(chain[0], 'Dynamic Kysely schema cannot be analyzed.')
         return true
@@ -41,11 +39,11 @@ export function readKyselyBuilder(
       chain.shift()
     }
     const first = chain[0]
-    if (!first || !ts.isPropertyAccessExpression(first.expression)) return false
+    if (!first) return false
     const method = methodOf(first)
     if (!['createTable', 'dropTable', 'createIndex', 'dropIndex'].includes(method)) return false
-    if (!ts.isPropertyAccessExpression(root) || root.name.text !== 'schema') return false
-    const objectName = staticString(ts, first.arguments[0])
+    if (memberName(root) !== 'schema') return false
+    const objectName = staticString(first.arguments[0])
     if (!objectName) {
       gap(first, 'Dynamic Kysely object identity cannot be analyzed.')
       return true
@@ -58,42 +56,31 @@ export function readKyselyBuilder(
         : '"' + name.replaceAll('"', '""') + '"'
     const qualified = (name: string) =>
       (schema && !name.includes('.') ? [schema, name] : name.split('.')).map(quote).join('.')
-    const strings = (array: import('typescript-ast').Node | undefined) =>
-      array &&
-      ts.isArrayLiteralExpression(array) &&
-      array.elements.every((element) => staticString(ts, element) !== undefined)
-        ? array.elements.map((element) => staticString(ts, element)!)
+    const strings = (array: Node | undefined) =>
+      array?.type === 'ArrayExpression' &&
+      array.elements.every((element) => staticString(element) !== undefined)
+        ? array.elements.map((element) => staticString(element)!)
         : undefined
-    const sqlValue = (
-      value: import('typescript-ast').Expression | undefined,
-    ): string | undefined => {
-      if (!value) return
-      if (ts.isStringLiteral(value)) return "'" + value.text.replaceAll("'", "''") + "'"
-      if (ts.isNumericLiteral(value)) return value.text
-      if (value.kind === ts.SyntaxKind.TrueKeyword) return 'TRUE'
-      if (value.kind === ts.SyntaxKind.FalseKeyword) return 'FALSE'
-      if (value.kind === ts.SyntaxKind.NullKeyword) return 'NULL'
+    const sqlValue = (value: Node | undefined): string | undefined => {
+      if (value?.type === 'Literal') {
+        if (typeof value.value === 'string') return "'" + value.value.replaceAll("'", "''") + "'"
+        if (typeof value.value === 'number') return String(value.value)
+        if (typeof value.value === 'boolean') return value.value ? 'TRUE' : 'FALSE'
+        if (value.value === null) return 'NULL'
+      }
+      if (value?.type === 'TaggedTemplateExpression' && isSql(value.tag))
+        return staticString(value.quasi)
       if (
-        ts.isTaggedTemplateExpression(value) &&
-        isSql(value.tag) &&
-        ts.isNoSubstitutionTemplateLiteral(value.template)
+        value?.type === 'CallExpression' &&
+        value.callee.type === 'MemberExpression' &&
+        memberName(value.callee) === 'raw' &&
+        isSql(value.callee.object)
       )
-        return value.template.text
-      if (
-        ts.isCallExpression(value) &&
-        ts.isPropertyAccessExpression(value.expression) &&
-        value.expression.name.text === 'raw' &&
-        isSql(value.expression.expression)
-      )
-        return staticString(ts, value.arguments[0])
+        return staticString(value.arguments[0])
     }
-    const modifiers = (callback: import('typescript-ast').Expression | undefined): Call[] => {
+    const modifiers = (callback: Node | undefined): CallExpression[] => {
       if (!callback) return []
-      while (ts.isParenthesizedExpression(callback)) callback = callback.expression
-      if (
-        (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) ||
-        ts.isBlock(callback.body)
-      ) {
+      if (callback.type !== 'ArrowFunctionExpression' || callback.body.type === 'BlockStatement') {
         gap(callback, 'Kysely modifier callback requires manual review.')
         return []
       }
@@ -111,8 +98,8 @@ export function readKyselyBuilder(
         const name = methodOf(call)
         if (['ifNotExists', 'temporary'].includes(name)) continue
         if (name === 'addColumn') {
-          const column = staticString(ts, call.arguments[0])
-          const type = staticString(ts, call.arguments[1])
+          const column = staticString(call.arguments[0])
+          const type = staticString(call.arguments[1])
           if (!column || !type) {
             gap(call, 'Dynamic Kysely column definition cannot be analyzed.')
             continue
@@ -135,7 +122,7 @@ export function readKyselyBuilder(
               if (value === undefined) gap(modifier, 'Dynamic Kysely default cannot be analyzed.')
               else definition += ' DEFAULT ' + value
             } else if (name === 'references') {
-              const target = staticString(ts, modifier.arguments[0])?.split('.')
+              const target = staticString(modifier.arguments[0])?.split('.')
               if (!target || target.length < 2)
                 gap(modifier, 'Dynamic Kysely reference cannot be analyzed.')
               else {
@@ -144,7 +131,7 @@ export function readKyselyBuilder(
                   ' REFERENCES ' + target.map(quote).join('.') + '(' + quote(field) + ')'
               }
             } else if (['onDelete', 'onUpdate'].includes(name)) {
-              const action = staticString(ts, modifier.arguments[0])
+              const action = staticString(modifier.arguments[0])
               if (action)
                 definition += (name === 'onDelete' ? ' ON DELETE ' : ' ON UPDATE ') + action
               else gap(modifier, 'Dynamic Kysely referential action cannot be analyzed.')
@@ -156,7 +143,7 @@ export function readKyselyBuilder(
             name,
           )
         ) {
-          const constraint = staticString(ts, call.arguments[0])
+          const constraint = staticString(call.arguments[0])
           const columns = strings(call.arguments[1])
           if (!constraint || !columns) {
             gap(call, 'Dynamic Kysely constraint cannot be analyzed.')
@@ -174,7 +161,7 @@ export function readKyselyBuilder(
             columns.map(quote).join(', ') +
             ')'
           if (name === 'addForeignKeyConstraint') {
-            const target = staticString(ts, call.arguments[2])
+            const target = staticString(call.arguments[2])
             const targetColumns = strings(call.arguments[3])
             if (!target || !targetColumns) {
               gap(call, 'Dynamic Kysely foreign key target cannot be analyzed.')
@@ -185,7 +172,7 @@ export function readKyselyBuilder(
           }
           definitions.push(definition)
         } else if (name === 'addCheckConstraint') {
-          const constraint = staticString(ts, call.arguments[0])
+          const constraint = staticString(call.arguments[0])
           const value = sqlValue(call.arguments[1])
           if (constraint && value !== undefined)
             definitions.push('CONSTRAINT ' + quote(constraint) + ' CHECK (' + value + ')')
@@ -196,7 +183,7 @@ export function readKyselyBuilder(
     }
     if (method === 'dropIndex' && dialect === 'mysql') {
       const target = chain.find((call) => methodOf(call) === 'on')
-      const table = target && staticString(ts, target.arguments[0])
+      const table = target && staticString(target.arguments[0])
       if (table) query += ' ON ' + qualified(table)
       else {
         gap(first, 'MySQL DROP INDEX requires a statically known table.')
@@ -210,9 +197,9 @@ export function readKyselyBuilder(
       let incomplete = false
       for (const call of chain.slice(1)) {
         const name = methodOf(call)
-        if (name === 'on') target = staticString(ts, call.arguments[0])
+        if (name === 'on') target = staticString(call.arguments[0])
         else if (name === 'column') {
-          const column = staticString(ts, call.arguments[0])
+          const column = staticString(call.arguments[0])
           if (column) (columns ??= []).push(column)
         } else if (name === 'columns') columns = strings(call.arguments[0])
         else if (name === 'unique') unique = true

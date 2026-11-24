@@ -5,43 +5,45 @@ description: 'Configure built-in database rules and author typed lint plugins.'
 
 Use complete rule IDs under `lint.rules`. Each setting accepts `off`, `warn`, `error`, or a tuple such as `['error', { format: 'snake_case' }]`.
 
+## Shared selectors
+
 All built-in rule options accept `include`, `exclude`, and `kinds` selectors. Include and exclude patterns match qualified object identities with `*` wildcards. Use `lint.overrides` for file globs, dialects, origins, kinds, and identity globs.
 
 ## Recommended rules
 
-| Rule ID                     | Default             | Rationale                                    |
-| --------------------------- | ------------------- | -------------------------------------------- |
-| `zenlev/naming/model-case`  | `error`, PascalCase | Follow ZenStack model conventions            |
-| `zenlev/naming/field-case`  | `error`, camelCase  | Follow ZenStack field conventions            |
-| `zenlev/naming/table-case`  | `error`, snake_case | Keep physical table names consistent         |
-| `zenlev/naming/column-case` | `error`, snake_case | Keep physical column names consistent        |
-| `zenlev/keys/primary-name`  | `error`, `id`       | Give single-column keys a predictable name   |
-| `zenlev/keys/no-sequential` | `error`             | Prefer keys suitable for distributed writers |
+| Rule ID                                                        | Default             | Rationale                                    |
+| -------------------------------------------------------------- | ------------------- | -------------------------------------------- |
+| [`zenlev/naming/model-case`](./reference/rules/model-case)     | `error`, PascalCase | Follow ZenStack model conventions            |
+| [`zenlev/naming/field-case`](./reference/rules/field-case)     | `error`, camelCase  | Follow ZenStack field conventions            |
+| [`zenlev/naming/table-case`](./reference/rules/table-case)     | `error`, snake_case | Keep physical table names consistent         |
+| [`zenlev/naming/column-case`](./reference/rules/column-case)   | `error`, snake_case | Keep physical column names consistent        |
+| [`zenlev/keys/primary-name`](./reference/rules/primary-name)   | `error`, `id`       | Give single-column keys a predictable name   |
+| [`zenlev/keys/no-sequential`](./reference/rules/no-sequential) | `error`             | Prefer keys suitable for distributed writers |
 
 The sequential-key rule covers ZModel `autoincrement()`, PostgreSQL serial, identity, and recognized sequence defaults, MySQL `AUTO_INCREMENT`, and SQLite rowid aliases. SQLite `INTEGER PRIMARY KEY` can generate values without an `AUTOINCREMENT` keyword. `WITHOUT ROWID` and the inline `PRIMARY KEY DESC` exception have different behavior.
 
-## Configurable rules
+## Opt-in rules
 
-| Rule ID                                                               | Options                                                                                                                            |
-| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `zenlev/naming/model-case`, `field-case`, `table-case`, `column-case` | `format`                                                                                                                           |
-| `zenlev/naming/identifier`                                            | `format`, `prefix`, `suffix`, `pattern`, `deny`, `reserved`, `maxLength`, `quoted`, `qualified`                                    |
-| `zenlev/naming/table-number`                                          | `form: 'singular' \| 'plural' \| 'unchanged'`, `irregular`, `uncountable`                                                          |
-| `zenlev/naming/join-table`                                            | `joins` entries with `table`, `left`, `right`, `template`, `order`, and `key`                                                      |
-| `zenlev/naming/foreign-key`                                           | `template`, `separator`, inflection overrides, `composite: 'skip' \| 'check'`                                                      |
-| `zenlev/naming/constraint`                                            | `template`, `templates` by kind, `separator`, inflection overrides, `explicit`                                                     |
-| `zenlev/keys/primary-name`                                            | `template`, `separator`, inflection overrides                                                                                      |
-| `zenlev/keys/primary-type`                                            | Allowed `types` and default-generator patterns in `defaults`                                                                       |
-| `zenlev/keys/foreign-key-index`                                       | Require a full index with the foreign key's leading column order                                                                   |
-| `zenlev/constraints/required-check`                                   | Required constraint name patterns in `names`                                                                                       |
-| `zenlev/columns/required`                                             | `columns` mapping names to `type`, `nullable`, and `default`                                                                       |
-| `zenlev/columns/conventions`                                          | `types`, `prefixes`, `suffix`, `forbiddenSuffixes`, `allowedTypes`                                                                 |
-| `zenlev/objects/restricted`                                           | `kinds`, `actions`, `allow`, `languages`                                                                                           |
-| `zenlev/objects/security`                                             | `security: 'invoker' \| 'definer'`, `trustedSearchPath`, `publicExecute`                                                           |
-| `zenlev/postgres/rls`                                                 | `tables`, `enabled`, `force`, `explicitUsing`, `explicitWriteCheck`, `noBroad`, `allowedRoles`, `roles`, `commands`, `defaultDeny` |
-| `zenlev/zenstack/policies`                                            | `commands`, `postUpdate`, `noBroad`                                                                                                |
+| Rule ID                                                                 | Options                                                                                                                            |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [`zenlev/naming/identifier`](./reference/rules/identifier)              | `format`, `prefix`, `suffix`, `pattern`, `deny`, `reserved`, `maxLength`, `quoted`, `qualified`                                    |
+| [`zenlev/naming/table-number`](./reference/rules/table-number)          | `form: 'singular' \| 'plural' \| 'unchanged'`, `irregular`, `uncountable`                                                          |
+| [`zenlev/naming/join-table`](./reference/rules/join-table)              | `joins` entries with `table`, `left`, `right`, `template`, `order`, and `key`                                                      |
+| [`zenlev/naming/foreign-key`](./reference/rules/foreign-key)            | `template`, `separator`, inflection overrides, `composite: 'skip' \| 'check'`                                                      |
+| [`zenlev/naming/constraint`](./reference/rules/constraint)              | `template`, `templates` by kind, `separator`, inflection overrides, `explicit`                                                     |
+| [`zenlev/keys/primary-type`](./reference/rules/primary-type)            | Allowed `types` and default-generator patterns in `defaults`                                                                       |
+| [`zenlev/keys/foreign-key-index`](./reference/rules/foreign-key-index)  | Require a full index with the foreign key's leading column order                                                                   |
+| [`zenlev/constraints/required-check`](./reference/rules/required-check) | Required constraint name patterns in `names`                                                                                       |
+| [`zenlev/columns/required`](./reference/rules/required-columns)         | `columns` mapping names to `type`, `nullable`, and `default`                                                                       |
+| [`zenlev/columns/conventions`](./reference/rules/column-conventions)    | `types`, `prefixes`, `suffix`, `forbiddenSuffixes`, `allowedTypes`                                                                 |
+| [`zenlev/objects/restricted`](./reference/rules/restricted-objects)     | `kinds`, `actions`, `allow`, `languages`                                                                                           |
+| [`zenlev/objects/security`](./reference/rules/object-security)          | `security: 'invoker' \| 'definer'`, `trustedSearchPath`, `publicExecute`                                                           |
+| [`zenlev/postgres/rls`](./reference/rules/postgres-rls)                 | `tables`, `enabled`, `force`, `explicitUsing`, `explicitWriteCheck`, `noBroad`, `allowedRoles`, `roles`, `commands`, `defaultDeny` |
+| [`zenlev/zenstack/policies`](./reference/rules/zenstack-policies)       | `commands`, `postUpdate`, `noBroad`                                                                                                |
 
 Formats include `PascalCase`, `camelCase`, `snake_case`, `kebab-case`, and `UPPER_SNAKE_CASE`. Identifier limits use PostgreSQL UTF-8 bytes and MySQL character counts.
+
+## Naming templates
 
 Naming templates accept `{name}`, `{schema}`, `{table}`, `{tableStem}`, `{columns}`, `{target}`, `{targetStem}`, `{targetColumns}`, and `{kind}`. Join templates accept `{left}` and `{right}`. Join order accepts `declared` or `lexical`. Key shape accepts `surrogate` or `composite`.
 

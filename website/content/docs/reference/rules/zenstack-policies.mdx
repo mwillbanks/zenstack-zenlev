@@ -1,0 +1,42 @@
+---
+title: 'ZenStack access policies'
+description: 'Check configured ZenStack model access declarations.'
+---
+
+Checks resolved ZModel access declarations, including delegated allow predicates. A literal broad allow can be reported even when another policy covers the same operation.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/zenstack/policies': [
+        'error',
+        {
+          include: ['orders.Order'],
+          commands: ['read', 'update'],
+          postUpdate: true,
+          noBroad: true,
+        },
+      ],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `commands` accepts `create`, `read`, `update`, `delete`, `post-update`, and `all`. Required commands look for an applicable allow declaration.
+- `postUpdate: true` requires an explicit `post-update` policy. An `all` policy does not satisfy that check.
+- `noBroad: true` flags literal true allow predicates.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+For `Order` mapped to `orders`, give read and update an applicable allow predicate and add a separate `post-update` policy to check the resulting row. Validate the predicates for the application role.

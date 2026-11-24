@@ -71,9 +71,26 @@ export default defineConfig({
 })
 ```
 
-Offline lint reads both `up` and `down` migration handlers. It recognizes supported Kysely schema builders, static SQL strings, and Kysely SQL templates with bound values. Dynamic SQL, unresolved helper effects, and opaque procedural bodies produce coverage warnings. Plain SQL and unescaped TypeScript literals can point to the SQL token. Escaped strings, interpolated templates, and Kysely builders point to the enclosing source expression. PostgreSQL source signatures use authored argument text where available. Live signatures use catalog input types. Source call rules recognize explicit `CALL` and qualified calls in supported SQL queries. Unqualified function calls can produce unresolved-identity warnings. Function overload selection can depend on runtime argument types.
+Offline lint uses Oxc to read both `up` and `down` migration handlers. It recognizes supported Kysely schema builders, static SQL strings, and Kysely SQL templates with bound values. Dynamic SQL, unresolved helper effects, and opaque procedural bodies produce coverage warnings. Plain SQL and unescaped TypeScript literals can point to the SQL token. Escaped strings, interpolated templates, and Kysely builders point to the enclosing source expression. PostgreSQL source signatures use authored argument text where available. Live signatures use catalog input types. Source call rules recognize explicit `CALL` and qualified calls in supported SQL queries. Unqualified function calls can produce unresolved-identity warnings. Function overload selection can depend on runtime argument types.
 
-PostgreSQL and MySQL load their packaged parsers on first use. SQLite uses the optional `sqlite3-parser` dependency, which installs by default and ships SQLite’s grammar. If you omit it, SQLite SQL analysis reports a coverage warning. Catalog metadata remains available, with a coverage warning for facts that depend on parsing stored DDL. [SQLite parser](https://github.com/justjake/sqlite3-parser-js)
+## Install the parser for your SQL dialect
+
+Install the optional peer for each SQL dialect you lint. Zenlev loads it when SQL analysis first needs it.
+
+| Dialect    | Parser peer      | Install with Bun                   |
+| ---------- | ---------------- | ---------------------------------- |
+| PostgreSQL | `libpg-query`    | `bun add --dev libpg-query@18`     |
+| MySQL      | `dt-sql-parser`  | `bun add --dev dt-sql-parser@4`    |
+| SQLite     | `sqlite3-parser` | `bun add --dev sqlite3-parser@0.7` |
+
+Use regular dependencies when migrations or schema push run in a deployment that omits dev dependencies. PostgreSQL uses its native grammar through WebAssembly. MySQL uses the MySQL grammar from dt-sql-parser. SQLite uses the published SQLite grammar. These parsers validate dialect-specific syntax and provide statement boundaries. Oxc parses TypeScript migration source and ZenStack parses ZModel.
+
+A missing SQL parser produces a coverage warning for affected inputs. SQLite can still audit catalog facts that come directly from metadata, with an additional gap when a check needs stored DDL. ZModel-only lint needs no SQL parser. Set `lint.dialect` for standalone Kysely projects so portable builder analysis uses the project's dialect. Without a detected dialect, portable Kysely builders use the PostgreSQL parser.
+
+- [PostgreSQL parser](https://github.com/constructive-io/libpg-query-node)
+- [MySQL parser](https://github.com/DTStack/dt-sql-parser)
+- [SQLite parser](https://github.com/justjake/sqlite3-parser-js)
+- [Oxc parser](https://oxc.rs/docs/guide/usage/parser)
 
 ## Enforce policy before writes
 

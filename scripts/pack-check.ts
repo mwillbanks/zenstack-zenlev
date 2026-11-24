@@ -7,12 +7,18 @@ import { parseArgs } from 'node:util'
 const root = resolve(import.meta.dir, '..')
 const skillNames = [
   'zenlev-deployment-planning',
+  'zenlev-linting',
   'zenlev-migration-authoring',
   'zenlev-plugin-authoring',
   'zenlev-recovery',
   'zenlev-schema-diff',
   'zenlev-setup',
 ]
+const sqlParsers = {
+  sqlite: 'sqlite3-parser',
+  postgresql: 'libpg-query',
+  mysql: 'dt-sql-parser',
+} as const
 const planScript = 'skills/zenlev-deployment-planning/scripts/check-plan.ts'
 const intentCli = resolve(root, 'node_modules/@tanstack/intent/dist/cli.mjs')
 type SkillCatalog = {
@@ -122,6 +128,9 @@ try {
         [manifest.name]: 'file:' + archivePath,
         '@zenstackhq/orm': manifest.devDependencies['@zenstackhq/orm'],
         kysely: manifest.devDependencies.kysely,
+        ...Object.fromEntries(
+          Object.values(sqlParsers).map((name) => [name, manifest.devDependencies[name]]),
+        ),
       },
       devDependencies: {
         '@types/bun': manifest.devDependencies['@types/bun'],
@@ -150,9 +159,19 @@ import { lintPlugin, lintProject, recommendedLintConfig, type LintResult } from 
 assert.equal(lintPlugin().name, 'zenlev-lint')
 const result: LintResult = await lintProject({
   cwd: import.meta.dir,
-  lint: { ...recommendedLintConfig, zmodel: false, migrations: false },
+  lint: {
+    ...recommendedLintConfig,
+    zmodel: false,
+    dialect: 'sqlite',
+    rules: {
+      ...recommendedLintConfig.rules,
+      'zenlev/naming/table-case': ['error', { format: 'snake_case' }],
+    },
+  },
 })
-assert.equal(result.status, 'ok')
+assert.equal(result.status, 'failed')
+assert.deepEqual(result.coverage.gaps, [])
+assert(result.diagnostics.some(({ ruleId }) => ruleId === 'zenlev/naming/table-case'))
 `,
     'db.ts':
       "import { Database, type SQLQueryBindings } from 'bun:sqlite'\nimport { ZenStackClient } from '@zenstackhq/orm'\nimport { SqliteDialect } from 'kysely'\nimport { resolve } from 'node:path'\n\nconst schema = {\n  provider: { type: 'sqlite' },\n  plugins: {},\n  models: {\n    Item: {\n      name: 'Item',\n      fields: {\n        id: { name: 'id', type: 'Int', id: true },\n        value: { name: 'value', type: 'String' },\n      },\n      idFields: ['id'],\n      uniqueFields: { id: { type: 'Int' } },\n    },\n  },\n} as const\n\nexport function createClient() {\n  const database = new Database(resolve(import.meta.dir, 'consumer.sqlite'))\n  const client = new ZenStackClient(schema, {\n    dialect: new SqliteDialect({\n      database: {\n        close: () => database.close(),\n        prepare(sql) {\n          const statement = database.prepare(sql)\n          return {\n            reader: statement.columnNames.length > 0,\n            all: (parameters) => statement.all(...(parameters as SQLQueryBindings[])),\n            run: (parameters) => statement.run(...(parameters as SQLQueryBindings[])),\n            iterate: (parameters) => statement.iterate(...(parameters as SQLQueryBindings[])),\n          }\n        },\n      },\n    }),\n  })\n  return { client, dispose: () => client.$disconnect() }\n}\n",
@@ -304,7 +323,7 @@ assert.equal(result.status, 'ok')
     resolve(consumer, 'lint.sql'),
     'CREATE TABLE packed_lint (id VARCHAR(36) PRIMARY KEY)',
   )
-  for (const dialect of ['sqlite', 'postgresql', 'mysql']) {
+  for (const dialect of Object.keys(sqlParsers)) {
     await Bun.write(
       resolve(consumer, 'lint-config.json'),
       JSON.stringify({
@@ -348,29 +367,31 @@ assert.equal(result.status, 'ok')
   )
   await run([process.execPath, 'install', '--ignore-scripts', '--omit=optional'], optionalConsumer)
   await copyFile(resolve(consumer, 'lint.sql'), resolve(optionalConsumer, 'lint.sql'))
-  await Bun.write(
-    resolve(optionalConsumer, 'lint-config.json'),
-    JSON.stringify({
-      lint: { dialect: 'sqlite', zmodel: false, migrations: false, sql: ['lint.sql'] },
-    }),
-  )
-  const withoutSqliteParser = await run(
-    [
-      process.execPath,
-      'run',
-      '--silent',
-      'zenlev',
-      'lint',
-      '--config',
-      'lint-config.json',
-      '--json',
-    ],
-    optionalConsumer,
-  )
-  const report = JSON.parse(withoutSqliteParser).result
-  assert.equal(report.status, 'ok')
-  assert.equal(report.coverage.gaps.length, 1)
-  assert.match(report.coverage.gaps[0].message, /sqlite3-parser/)
+  for (const [dialect, parser] of Object.entries(sqlParsers)) {
+    await Bun.write(
+      resolve(optionalConsumer, 'lint-config.json'),
+      JSON.stringify({
+        lint: { dialect, zmodel: false, migrations: false, sql: ['lint.sql'] },
+      }),
+    )
+    const output = await run(
+      [
+        process.execPath,
+        'run',
+        '--silent',
+        'zenlev',
+        'lint',
+        '--config',
+        'lint-config.json',
+        '--json',
+      ],
+      optionalConsumer,
+    )
+    const report = JSON.parse(output).result
+    assert.equal(report.status, 'ok')
+    assert.equal(report.coverage.gaps.length, 1)
+    assert(report.coverage.gaps[0].message.includes(parser))
+  }
 
   const applied = JSON.parse(
     await run(

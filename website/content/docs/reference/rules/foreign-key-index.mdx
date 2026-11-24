@@ -1,0 +1,32 @@
+---
+title: 'Foreign key index coverage'
+description: 'Require an index whose leading columns cover the foreign key in order.'
+---
+
+A full index, unique constraint, or primary key can satisfy coverage. A partial index covers only some rows of the referencing table.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/keys/foreign-key-index': 'error',
+    },
+  },
+})
+```
+
+## Parameters
+
+The rule has only shared selectors. Selectors match the foreign key identity.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+For a foreign key on `(customer_id, region_id)`, an index on `(customer_id, region_id, created_at)` passes. An index on `(region_id, customer_id)` fails.

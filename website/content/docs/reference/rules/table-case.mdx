@@ -1,0 +1,32 @@
+---
+title: 'Table case'
+description: 'Require snake_case physical table names by default.'
+---
+
+Checks physical table names from ZModel mappings, SQL declarations, migration operations, and visible catalogs. The diagnostic points to `@@map` when available.
+
+The recommended preset enables this rule at `error`. Configure it explicitly to change the parameters or severity.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/naming/table-case': ['error', { format: 'snake_case' }],
+    },
+  },
+})
+```
+
+## Parameters
+
+`format` selects `snake_case` (default), `PascalCase`, `camelCase`, `kebab-case`, or `UPPER_SNAKE_CASE`.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+Map `model OrderLine` with `@@map("order_line")`. For SQL, write `CREATE TABLE order_line (id TEXT PRIMARY KEY)`.

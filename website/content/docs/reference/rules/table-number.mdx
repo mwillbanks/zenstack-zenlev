@@ -1,0 +1,36 @@
+---
+title: 'Table number'
+description: 'Configure plural or singular physical table names.'
+---
+
+Checks physical table name inflection. For snake_case names, inflection can apply to the final word.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/naming/table-number': [
+        'error',
+        { form: 'plural', irregular: { person: 'people' }, uncountable: ['equipment'] },
+      ],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `form` accepts `plural` (default), `singular`, and `unchanged`.
+- `irregular` maps singular forms to plural forms. `uncountable` lists forms to preserve.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+Rename `account_person` to `account_people`. `equipment` can keep its existing form.

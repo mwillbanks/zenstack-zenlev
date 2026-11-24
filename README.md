@@ -99,7 +99,7 @@ The CLI also runs as `zenstack-zenlev`. Add `--json` for automation. [First migr
 bun run zenlev lint --max-warnings 0
 ```
 
-Zenlev applies its recommended naming and primary-key rules. Configure project conventions under `lint`. Register `plugins: [lintPlugin()]` to enforce lint during apply and schema push. [Lint configuration and plugins](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/linting)
+Zenlev applies its recommended naming and primary-key rules. Configure project conventions under `lint`. Install the optional parser peer for each SQL dialect you lint: `libpg-query@18` for PostgreSQL, `dt-sql-parser@4` for MySQL, or `sqlite3-parser@0.7` for SQLite. Register `plugins: [lintPlugin()]` to enforce lint during apply and schema push. [Lint configuration and plugins](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/linting)
 
 ### 5. Install agent guidance
 
@@ -124,7 +124,7 @@ bun run intent list
 bun run intent load '@mwillbanks/zenstack-zenlev#zenlev-setup'
 ```
 
-Use a Zenlev release that includes `skills/`. Intent loads guidance from the installed version. The six skills cover setup, migration authoring, deployment planning, schema diffing, plugin authoring, and recovery. [Agent Skills installation and allowlist examples](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/agent-skills)
+Use a Zenlev release that includes `skills/`. Intent loads guidance from the installed version. The seven skills cover setup, database linting, migration authoring, deployment planning, schema diffing, plugin authoring, and recovery. [Agent Skills installation and allowlist examples](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/agent-skills)
 
 ## Moving from Prisma Migrate
 

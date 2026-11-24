@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
-import Ajv from 'ajv'
+import { join } from 'node:path'
+import Schema from 'typebox/schema'
 import { builtinPresets, builtinRules, recommendedLintConfig } from '../../../src/lint/rules'
 import { inspect, table } from './fixtures'
 
@@ -11,6 +12,26 @@ test('recommended preset exposes six documented defaults and optional families',
   expect(Object.keys(builtinRules)).toHaveLength(20)
 })
 
+test('documents every built-in rule once and lists every page in navigation', async () => {
+  const root = join(import.meta.dir, '../../../website/content/docs/reference')
+  const directory = join(root, 'rules')
+  const pages = Array.from(new Bun.Glob('*.mdx').scanSync(directory)).sort()
+  const navigation = (await Bun.file(join(directory, 'meta.json')).json()).pages as string[]
+  expect(navigation.map((slug) => slug + '.mdx').sort()).toEqual(pages)
+
+  const overview = await Bun.file(join(root, 'lint-rules.mdx')).text()
+  const rules = await Promise.all(
+    pages.map(async (page) => {
+      const content = await Bun.file(join(directory, page)).text()
+      expect(content).toContain('## Parameters')
+      expect(content).toContain('## Example')
+      expect(overview).toContain('./reference/rules/' + page.slice(0, -4) + ')')
+      return /^\s*'zenlev\/([^']+)':/m.exec(content)?.[1]
+    }),
+  )
+  expect(rules.sort()).toEqual(Object.keys(builtinRules).sort())
+})
+
 test('rule creators reject malformed option primitives and nested mappings', () => {
   expect(() => inspect('naming/table-case', [], null)).toThrow('object')
   expect(() => inspect('naming/table-case', [], [])).toThrow('object')
@@ -20,11 +41,14 @@ test('rule creators reject malformed option primitives and nested mappings', () 
 })
 
 test('built-in option schemas reject typos and malformed structures before scanning', () => {
-  const ajv = new Ajv({ strictTuples: false })
   for (const [name, rule] of Object.entries(builtinRules)) {
-    const validate = ajv.compile({ type: 'array', items: rule.meta.schema, additionalItems: false })
-    expect(validate([]), name).toBe(true)
-    expect(validate([{ unknownOption: true }]), name).toBe(false)
+    const validate = Schema.Compile({
+      type: 'array',
+      items: rule.meta.schema,
+      additionalItems: false,
+    })
+    expect(validate.Check([]), name).toBe(true)
+    expect(validate.Check([{ unknownOption: true }]), name).toBe(false)
   }
   const cases: [string, unknown][] = [
     ['naming/table-case', { format: 'mixed' }],
@@ -37,8 +61,8 @@ test('built-in option schemas reject typos and malformed structures before scann
     ['zenstack/policies', { commands: ['insert'] }],
   ]
   for (const [name, config] of cases) {
-    expect(ajv.compile({ type: 'array', items: builtinRules[name]!.meta.schema })([config])).toBe(
-      false,
-    )
+    expect(
+      Schema.Compile({ type: 'array', items: builtinRules[name]!.meta.schema }).Check([config]),
+    ).toBe(false)
   }
 })

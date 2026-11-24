@@ -1,4 +1,4 @@
-import Ajv from 'ajv'
+import Schema from 'typebox/schema'
 import { createHash } from 'node:crypto'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -191,7 +191,7 @@ export async function createLintRunner(config: LintConfig, cwd: string, base = c
   }
   Object.assign(defaults, config.rules)
   const disabled: Setting = { severity: 'off', options: [] }
-  const ajv = new Ajv({ strict: false })
+  const validators = new Map<string, ReturnType<typeof Schema.Compile>>()
   const decode = (id: string, value: LintRuleSetting): Setting => {
     const rule = rules.get(id)
     if (!rule) throw new TypeError('Unknown lint rule: ' + id)
@@ -201,21 +201,21 @@ export async function createLintRunner(config: LintConfig, cwd: string, base = c
       throw new TypeError('Invalid severity for ' + id)
     const schema = rule.meta.schema ?? []
     if (!Array.isArray(schema)) throw new TypeError('Invalid lint option schema for ' + id)
-    if (
-      options.length > schema.length ||
-      (options.length &&
-        !ajv.validate(
-          {
-            type: 'array',
-            items: schema,
-            additionalItems: false,
-          },
-          options,
-        ))
-    ) {
-      throw new TypeError(
-        'Invalid lint options for ' + id + (ajv.errors ? ': ' + ajv.errorsText() : ''),
-      )
+    if (options.length > schema.length) throw new TypeError('Invalid lint options for ' + id)
+    if (options.length) {
+      let validator = validators.get(id)
+      if (!validator) {
+        validator = Schema.Compile({ type: 'array', items: schema, additionalItems: false })
+        validators.set(id, validator)
+      }
+      const [valid, errors] = validator.Errors(options)
+      if (!valid)
+        throw new TypeError(
+          'Invalid lint options for ' +
+            id +
+            ': ' +
+            errors.map(({ instancePath, message }) => instancePath + ' ' + message).join(', '),
+        )
     }
     return { severity: level as LintSeverity, options }
   }

@@ -1,0 +1,46 @@
+---
+title: 'Required columns'
+description: 'Require named columns and optional type, nullability, and default properties.'
+---
+
+Applies to selected tables. It can require audit fields or other columns that follow the same contract.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/columns/required': [
+        'error',
+        {
+          include: ['app.orders'],
+          columns: {
+            created_at: {
+              type: 'timestamp',
+              nullable: false,
+            },
+            updated_at: {
+              nullable: false,
+            },
+          },
+        },
+      ],
+    },
+  },
+})
+```
+
+## Parameters
+
+`columns` maps physical column names to objects with optional `type` (normalized text), `nullable` (boolean), and `default` (normalized expression matched exactly). An empty object requires presence only.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+Declare both `created_at` and `updated_at` on `app.orders`. Use a non-null `timestamp` for `created_at`.

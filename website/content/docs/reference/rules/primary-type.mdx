@@ -1,0 +1,33 @@
+---
+title: 'Primary key type and default'
+description: 'Set permitted primary key types and default generator patterns.'
+---
+
+Checks each primary key column. Choose options that match the normalized types and expressions exposed by the selected input and dialect.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/keys/primary-type': ['error', { types: ['uuid'], defaults: ['*gen_random_uuid()*'] }],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `types` lists exact normalized type names.
+- `defaults` lists exact or wildcard patterns for the default expression. When supplied, the column must have a matching default.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+A PostgreSQL column defined as `id uuid PRIMARY KEY DEFAULT gen_random_uuid()` meets this policy. An application-assigned `uuid` can pass if `defaults` is omitted.

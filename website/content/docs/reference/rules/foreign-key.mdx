@@ -1,0 +1,36 @@
+---
+title: 'Foreign key column names'
+description: 'Configure foreign key column names from resolved targets.'
+---
+
+Checks source column names against the referenced table. Missing target evidence produces a coverage gap.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/naming/foreign-key': ['error', { template: '{targetStem}_id', composite: 'check' }],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `template` defaults to `{targetStem}_id`. `separator` joins column lists in template substitutions and defaults to `_`.
+- `irregular` maps singular forms to plural forms. `uncountable` preserves the listed forms.
+- `composite` defaults to `skip`. With `check`, each source column must match the singular target table name followed by `_` and the corresponding target column.
+
+See the rule overview for [naming template variables](./reference/lint-rules#naming-templates).
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+A single-column reference to `customers(id)` uses `customer_id`. A composite reference to `customers(region, serial)` uses `customer_region` and `customer_serial` in that order.

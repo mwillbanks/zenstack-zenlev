@@ -1,0 +1,35 @@
+---
+title: 'Primary key name'
+description: 'Configure the physical name of single-column primary keys.'
+---
+
+Checks single-column primary keys. Composite keys retain their component names.
+
+The recommended preset enables this rule at `error`. Configure it explicitly to change the parameters or severity.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/keys/primary-name': ['error', { template: '{tableStem}_id' }],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `template` defaults to `id`. `separator` joins lists in template substitutions and defaults to `_`.
+- `irregular` maps singular forms to plural forms. `uncountable` preserves the listed forms.
+
+See the rule overview for [naming template variables](./reference/lint-rules#naming-templates).
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+With the configured template, `orders` uses `order_id`. A ZModel field can keep the logical name `id` and use `@map("order_id")`.

@@ -1,0 +1,32 @@
+---
+title: 'Field case'
+description: 'Require camelCase ZModel field names by default.'
+---
+
+Checks logical fields, including relation and computed fields. A stored field can use `@map` to declare its physical column name.
+
+The recommended preset enables this rule at `error`. Configure it explicitly to change the parameters or severity.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/naming/field-case': ['error', { format: 'camelCase' }],
+    },
+  },
+})
+```
+
+## Parameters
+
+`format` selects `camelCase` (default), `PascalCase`, `snake_case`, `kebab-case`, or `UPPER_SNAKE_CASE`.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+`createdAt DateTime @map("created_at")` passes. Rename a logical `created_at` field to `createdAt` and preserve the physical mapping.

@@ -1,0 +1,48 @@
+---
+title: 'Join table conventions'
+description: 'Require names and key shapes for explicitly selected relationship tables.'
+---
+
+Configure each relationship table explicitly. This supports joins with payload fields, self-relations, and project-specific side order.
+
+Enable this opt-in rule under `lint.rules`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    rules: {
+      'zenlev/naming/join-table': [
+        'error',
+        {
+          joins: [
+            {
+              table: 'app.order_*',
+              left: 'order',
+              right: 'tag',
+              template: '{left}_{right}',
+              order: 'declared',
+              key: 'composite',
+            },
+          ],
+        },
+      ],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `joins` is a list. Each entry requires `table` (qualified identity or wildcard), `left`, and `right`.
+- `template` accepts `{left}` and `{right}` and defaults to `{left}_{right}`.
+- `order` accepts `declared` (default) or `lexical`. `key` optionally requires `surrogate` (one PK column) or `composite` (multiple PK columns).
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors).
+
+## Example
+
+`app.order_tag` with `PRIMARY KEY (order_id, tag_id)` passes. The selector also finds an existing `app.order_labels` table to report its name.
