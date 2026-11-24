@@ -12,10 +12,10 @@
     }
   },
   "zenlev-linting": {
-    "reason": "Reviewed table-level unique parsing and normalized metadata parity after the frozen lint correction.",
+    "reason": "Reviewed parser and telemetry peer ranges and Tuil's React requirement.",
     "files": {
       "README.md": "9bb2edcdb1b51aa8f202c633f8f5611c38af54860b347163ec65e560dc2e3bc3",
-      "package.json": "6da71ebe1fa047b7bb97326b06043a5cda6f3be165d16155a7e1c55e0f5e6585",
+      "package.json": "5c2339df100706fdfe7dd71b84ac78325c13bc69a70965c5bb08be0fa215b87e",
       "src/lint/mysql/parser.ts": "578ed3c4ec1d86d36be867804684c52ff22ee2cb79b1b080891fde798ec8f937",
       "src/lint/plugin.ts": "75ac041b9b00b5c95b08a7d76ebada51186aa2bde0bc0ae7d494a21cb62d23ce",
       "src/lint/postgresql/parser.ts": "acd9901df6a65f417592501a41b90437af7990207baf4becd4f53cf4792f99de",
