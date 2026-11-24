@@ -9,6 +9,7 @@ import {
   words,
   topLevel,
   typeName,
+  serialType,
   type Token,
   type EmitNode,
 } from './tokens'
@@ -156,18 +157,28 @@ export function tableDefinitions(
           keyword(token, word),
         ),
     )
+    const serial = serialType(type, dialect)
+    const explicitMysqlNull =
+      dialect === 'mysql' &&
+      surface.some(
+        (token, index) =>
+          keyword(token, 'NULL') &&
+          !['DEFAULT', 'NOT', 'SET'].some((word) => keyword(surface[index - 1], word)),
+      )
+    const notNull = surface.some(
+      (token, index) => keyword(token, 'NOT') && keyword(surface[index + 1], 'NULL'),
+    )
     make('column', column, {
       table: item.name,
       schema: item.schema,
       type,
       identity: identity(item.schema, item.name, column.name),
       nullable:
-        !surface.some(
-          (token, index) => keyword(token, 'NOT') && keyword(surface[index + 1], 'NULL'),
-        ) && !(dialect !== 'sqlite' && position(surface, 'PRIMARY') >= 0),
+        !notNull &&
+        !(dialect !== 'sqlite' && position(surface, 'PRIMARY') >= 0) &&
+        !(serial && !explicitMysqlNull),
       sequential:
-        ((dialect === 'postgresql' || dialect === 'mysql') &&
-          /^(?:smallserial|serial|bigserial|serial2|serial4|serial8)$/i.test(type)) ||
+        serial ||
         definition.slice(current + 1).some((token, offset, rest) => {
           if (keyword(rest[offset - 1], 'CONSTRAINT')) return false
           if (dialect === 'mysql' && keyword(token, 'AUTO_INCREMENT')) return true

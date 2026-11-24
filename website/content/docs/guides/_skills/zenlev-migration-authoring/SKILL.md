@@ -14,6 +14,11 @@ metadata:
     src/migrate/files.ts
     src/lint/project.ts
     src/lint/source/migration.ts
+    src/lint/source/sql.ts
+    src/lint/source/statement.ts
+    src/lint/source/query.ts
+    src/lint/source/tokens.ts
+    src/lint/source/kysely.ts
     src/lint/source/kysely/ast.ts
     src/lint/source/kysely/context.ts
     src/lint/source/kysely/table.ts
@@ -46,7 +51,7 @@ MySQL DDL can commit implicitly. External requests and other arbitrary TypeScrip
 
 Entry-file bytes are hashed, with normalized line endings by default. Imported helpers, external data, and other effects are outside that hash. Prefer a new migration for changed behavior. Do not silently edit an applied file or accept a changed hash without source review.
 
-Lint uses ZenStack's parser for ZModel and Oxc for static migration analysis. Supported Kysely schema builders become structured lint evidence without requiring a SQL parser peer. Authored SQL strings and opaque helper effects follow the configured dialect parser and can produce coverage warnings. Lint does not import migration modules. Configure mappings and conventions under `lint`. Register `plugins: [lintPlugin()]` to check final write plans, including structured evidence for generated schema changes. Review uncovered effects explicitly.
+Lint uses ZenStack's parser for ZModel and Oxc for static migration analysis. Supported Kysely schema builders become structured lint evidence without requiring a SQL parser peer. Static authored SQL strings use the configured dialect parser and can produce coverage warnings when parsing is unavailable. Opaque helper effects can fall outside static analysis and produce coverage warnings that need manual review. Lint does not import migration modules. Configure mappings and conventions under `lint`. Register `plugins: [lintPlugin()]` to check final write plans, including structured evidence for generated schema changes. Review uncovered effects explicitly.
 
 A `down` must account for data written after deployment. Dropping a populated column is not a faithful inverse of adding it.
 

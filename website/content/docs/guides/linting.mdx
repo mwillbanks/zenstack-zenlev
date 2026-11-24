@@ -73,9 +73,9 @@ export default defineConfig({
 
 Offline lint uses Oxc to read both `up` and `down` migration handlers. It projects supported Kysely schema builders directly into lint evidence, and parses static SQL strings and Kysely SQL templates with bound values. Dynamic SQL, dynamic module imports, unresolved helper effects, and opaque procedural bodies produce coverage warnings. Plain SQL and unescaped TypeScript literals can point to the SQL token. Escaped strings, interpolated templates, and Kysely builders point to the enclosing source expression. PostgreSQL source signatures use authored argument text where available. Live signatures use catalog input types. Source call rules recognize explicit `CALL` and qualified calls in supported SQL queries. Unqualified function calls can produce unresolved-identity warnings. Function overload selection can depend on runtime argument types.
 
-## Install a parser for SQL text
+## Install a parser for SQL text and SQLite catalogs
 
-Install an optional peer when lint inputs contain authored SQL text. Zenlev loads that parser when SQL text analysis first needs it. Structured ZModel, supported Kysely schema builders, and generated `db push` plans do not need a SQL parser peer.
+Install an optional peer for authored SQL text and SQLite catalog parsing of stored table definitions. Zenlev loads that parser when SQL text analysis first needs it. Structured ZModel, supported Kysely schema builders, and generated statement evidence do not need a SQL parser peer. A SQLite catalog audit during `db push` still attempts to parse each stored table definition that exists.
 
 | Dialect    | Parser peer      | Install with Bun                   |
 | ---------- | ---------------- | ---------------------------------- |
@@ -85,7 +85,7 @@ Install an optional peer when lint inputs contain authored SQL text. Zenlev load
 
 Use regular dependencies when migrations or schema push run in a deployment that omits dev dependencies. PostgreSQL uses its native grammar through WebAssembly. MySQL uses the MySQL grammar from dt-sql-parser. SQLite uses the published SQLite grammar. These parsers validate authored SQL syntax and provide statement boundaries. Oxc parses TypeScript migration source and ZenStack parses ZModel. Static migration analysis projects supported Kysely schema builders directly into normalized lint nodes. Schema push carries structured evidence alongside each generated SQL statement, in execution order. The SQL remains available to existing hooks unchanged.
 
-A missing SQL parser produces a coverage warning when an input requires SQL text parsing, such as a `.sql` file or raw SQL in a migration. SQLite catalog checks use available metadata directly and parse stored table definitions when they need facts such as named `CHECK` constraints. ZModel-only lint, supported Kysely builder analysis, and generated schema push evidence need no SQL parser. Set `lint.dialect` for standalone Kysely projects so builder details use the project's dialect.
+A missing SQL parser produces a coverage warning when an input requires SQL text parsing, such as a `.sql` file or raw SQL in a migration. SQLite catalog checks read available metadata, including PRAGMA results, and attempt to parse every stored table definition that exists to recover facts metadata does not expose, such as named `CHECK` constraints. Without the SQLite parser, those definitions produce parse coverage gaps while metadata-based checks continue. If a table has no stored definition, only rule-specific facts that depend on that definition are unavailable. ZModel-only lint, supported Kysely builder analysis, and generated schema push evidence need no SQL parser. Set `lint.dialect` for standalone Kysely projects so builder details use the project's dialect.
 
 - [PostgreSQL parser](https://github.com/constructive-io/libpg-query-node)
 - [MySQL parser](https://github.com/DTStack/dt-sql-parser)
@@ -114,7 +114,7 @@ export default defineConfig({
 })
 ```
 
-The plugin uses the same lint settings as the standalone command. It checks the locked, validated apply plan after plan transformations. Generated rollback migrations include the original `down` handlers in execution order. Schema push checks the recomputed, confirmed SQL, per-statement structured evidence, and affected desired definitions. Push diagnostics point to the start of the generated statement and use its SQL hash. Existing exceptions derived from a previous diagnostic range may need to be recreated.
+The plugin uses the same lint settings as the standalone command. It checks the locked, validated apply plan after plan transformations. Generated rollback migrations include the original `down` handlers in execution order. Schema push checks the recomputed, confirmed SQL, per-statement structured evidence, and affected desired definitions. Diagnostics backed by generated statement evidence point to the start of the corresponding generated statement and use its SQL hash. ZModel diagnostics retain their ZModel source locations. Existing exceptions based on a previous generated-statement range may need to be refreshed.
 
 An error rejects the entire plan before migration handlers or push SQL execute. Coverage warnings permit the write. Require `lint --max-warnings 0` in pull request checks when all warnings need review.
 

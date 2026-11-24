@@ -13,6 +13,10 @@ metadata:
     website/content/docs/guides/linting.mdx
     src/database.ts
     src/config.ts
+    src/lint/source/kysely.ts
+    src/lint/plugin.ts
+    src/lint/sqlite/catalog.ts
+    src/schema/diff/evidence.ts
     src/types.ts
 ---
 
@@ -44,7 +48,7 @@ Namespace labels group migrations within one ledger. They do not isolate databas
 
 1. Run `bun run zenlev lint --json` from the application directory. Zenlev applies its recommended ZModel mapping and primary-key rules by default.
 2. For standalone SQL or Kysely, set `lint.zmodel: false` and `lint.dialect`. Set `lint.sql` to the SQL file globs you want to check.
-3. Install an optional parser peer when linting authored SQL files or raw SQL migrations. Use `libpg-query@18` for PostgreSQL, `dt-sql-parser@4` for MySQL, or `sqlite3-parser@0.7` for SQLite. Supported Kysely builders and generated schema push evidence use structured linting without a parser peer. SQLite catalog lint parses stored table definitions only when it needs facts such as named `CHECK` constraints.
+3. Install an optional parser peer for authored SQL files, raw migration SQL, and SQLite catalog parsing of stored table definitions. Use `libpg-query@18` for PostgreSQL, `dt-sql-parser@4` for MySQL, or `sqlite3-parser@0.7` for SQLite. SQLite catalog lint attempts to parse each stored table definition that exists, regardless of configured rules. Without the SQLite parser, report parse coverage gaps and continue checks supported by available metadata, including PRAGMA results. If a table has no stored definition, only rule-specific facts that depend on it are unavailable. Supported Kysely builders and generated statement evidence use structured linting without a parser peer. A SQLite catalog audit during `db push` still attempts to parse each stored table definition that exists.
 4. Use regular dependencies if a deployment environment runs lint or write enforcement without dev dependencies.
 5. Add `bun run zenlev lint --max-warnings 0` to CI. Use `plugins: [lintPlugin()]` to enforce lint on migration apply and schema push.
 6. Load `zenlev-linting` for rule selection, coverage diagnostics, exceptions, and live audit steps.

@@ -1,4 +1,5 @@
 import type { CallExpression } from 'oxc-parser'
+import { serialType } from '../tokens'
 import { constraint, emit, expression, sequentialDefault, type BuilderContext } from './context'
 import { methodOf, modifierCalls, qualified, staticString, strings } from './ast'
 
@@ -11,10 +12,13 @@ function addColumn(call: CallExpression, context: BuilderContext): void {
   }
   const column = emit(context, 'column', name, {
     type: context.dialect === 'mysql' && type === 'integer' ? 'int' : type,
-    nullable: true,
+    nullable:
+      !context.dialect && serialType(type, 'postgresql')
+        ? undefined
+        : !serialType(type, context.dialect),
     sequential:
       context.dialect === 'postgresql' || context.dialect === 'mysql'
-        ? /^(?:smallserial|serial|bigserial|serial2|serial4|serial8)$/i.test(type)
+        ? serialType(type, context.dialect)
         : undefined,
   })
   const uncertain = (node: Parameters<BuilderContext['gap']>[0], message: string) => {

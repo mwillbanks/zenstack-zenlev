@@ -25,6 +25,73 @@ async function migration(
 }
 
 describe('migration source inspection', () => {
+  test('leaves portable serial nullability unknown while retaining explicit notNull', async () => {
+    const path = join(directory, 'portable.ts')
+    await Bun.write(
+      path,
+      "export async function up(ctx) { await ctx.db.schema.createTable('records').addColumn('implicit','serial').addColumn('explicit','serial',c=>c.notNull()).execute(); }",
+    )
+    const input = await readMigrationLintInputs(path, undefined, ['up'])
+    expect(node(input, 'column', 'implicit').nullable).toBeUndefined()
+    expect(node(input, 'column', 'implicit').sequential).toBeUndefined()
+    expect(node(input, 'column', 'explicit').nullable).toBe(false)
+    expect(input.gaps).toEqual([])
+  })
+
+  test.each(['postgresql', 'mysql', 'sqlite'])(
+    'projects signed static %s defaults without parsing SQL statements',
+    async (dialect) => {
+      const input = await migration(
+        "export async function up(ctx) { await ctx.db.schema.createTable('numbers').addColumn('negative','integer',c=>c.defaultTo(-1)).addColumn('positive','integer',c=>c.defaultTo(+1)).addColumn('fraction','numeric',c=>c.defaultTo(-0.25)).addColumn('zero','integer',c=>c.defaultTo(-0)).addColumn('dynamic','integer',c=>c.defaultTo(-ctx.value)).execute(); }",
+        dialect,
+      )
+      const raw = await parseSqlLintInput(
+        'CREATE TABLE numbers (negative integer DEFAULT -1, positive integer DEFAULT 1, fraction numeric DEFAULT -0.25, zero integer DEFAULT 0);',
+        dialect,
+        source,
+      )
+      for (const name of ['negative', 'positive', 'fraction', 'zero'])
+        expect(node(input, 'column', name).default).toBe(node(raw, 'column', name).default)
+      expect(node(input, 'column', 'dynamic').default).toBeUndefined()
+      expect(input.gaps.map(({ message }) => message)).toEqual([
+        'Dynamic Kysely default cannot be analyzed.',
+      ])
+    },
+  )
+
+  test.each([
+    ['postgresql', ['smallserial', 'serial', 'bigserial', 'serial2', 'serial4', 'serial8']],
+    ['mysql', ['SERIAL']],
+  ] as const)(
+    'projects implicit %s serial nullability consistently with SQL',
+    async (dialect, types) => {
+      for (const type of types) {
+        const input = await migration(
+          "export async function up(ctx) { await ctx.db.schema.createTable('records').addColumn('value','" +
+            type +
+            "').execute(); }",
+          dialect,
+        )
+        const raw = await parseSqlLintInput(
+          'CREATE TABLE records (value ' + type + ');',
+          dialect,
+          source,
+        )
+        expect(input.gaps).toEqual([])
+        expect(raw.gaps).toEqual([])
+        expect(node(input, 'column', 'value')).toMatchObject({ nullable: false, sequential: true })
+        expect(node(raw, 'column', 'value')).toMatchObject({ nullable: false, sequential: true })
+      }
+      if (dialect === 'mysql') {
+        const input = await migration(
+          "export async function up(ctx) { await ctx.db.schema.createTable('records').addColumn('value','bigserial').execute(); }",
+          dialect,
+        )
+        expect(node(input, 'column', 'value')).toMatchObject({ nullable: true, sequential: false })
+      }
+    },
+  )
+
   test('retains modifiers through parentheses and omits incomplete index evidence', async () => {
     const input = await migration(
       "export async function up(ctx) { await ctx.db.schema.createTable('users').addColumn('id', 'integer', (c => ((c.primaryKey()).notNull()))).execute(); await ctx.db.schema.createIndex('partial_idx').on('users').column('id').where('id', '>', 1).execute(); }",

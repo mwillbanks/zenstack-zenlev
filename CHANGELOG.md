@@ -15,7 +15,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 
 ### Changed
 
-- Project supported Kysely migration builders and generated schema push operations directly into lint evidence before SQL rendering.
+- Represent supported Kysely migration builders and generated schema push statements as structured lint evidence before SQL rendering.
 - Use Oxc to inspect TypeScript migrations and TypeBox to validate JSON Schema rule options.
 - Let consumers select compatible ZenStack, React, and OpenTelemetry peers. Install the optional parser peer for each dialect that needs SQL analysis.
 

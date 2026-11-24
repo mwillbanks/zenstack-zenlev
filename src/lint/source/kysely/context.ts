@@ -76,6 +76,15 @@ export function expression(value: Node | undefined, context: BuilderContext): st
     if (typeof value.value === 'boolean') return value.value ? 'TRUE' : 'FALSE'
     if (value.value === null) return 'NULL'
   }
+  if (
+    value?.type === 'UnaryExpression' &&
+    (value.operator === '-' || value.operator === '+') &&
+    value.argument.type === 'Literal' &&
+    typeof value.argument.value === 'number'
+  ) {
+    const number = value.operator === '-' ? -value.argument.value : value.argument.value
+    return words(tokenize(String(number), context.dialect ?? ''))
+  }
   let text: string | undefined
   if (value?.type === 'TaggedTemplateExpression' && context.isSql(value.tag))
     text = staticString(value.quasi)

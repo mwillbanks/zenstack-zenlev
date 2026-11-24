@@ -151,6 +151,13 @@ export function topLevel(tokens: readonly Token[]): Token[] {
   })
 }
 
+/** Types whose database expansion supplies a sequence and implicit NOT NULL. */
+export function serialType(type: string, dialect: string | undefined): boolean {
+  if (dialect === 'postgresql')
+    return /^(?:smallserial|serial|bigserial|serial2|serial4|serial8)$/i.test(type)
+  return dialect === 'mysql' && /^serial$/i.test(type)
+}
+
 export function typeName(tokens: readonly Token[]): string {
   return words(tokens).replace(/\s*([(),.[\]])\s*/g, '$1')
 }

@@ -3,6 +3,18 @@ import { parseSqlLintInput } from '../../../src/lint/source'
 import { node, source } from './fixtures'
 
 describe('SQL source evidence regressions', () => {
+  test('distinguishes MySQL SERIAL NULL from default and referential NULL tokens', async () => {
+    const input = await parseSqlLintInput(
+      'CREATE TABLE records (explicit SERIAL NULL, implicit SERIAL, defaulted SERIAL DEFAULT NULL, referenced SERIAL REFERENCES parents(id) ON DELETE SET NULL);',
+      'mysql',
+      source,
+    )
+    expect(input.gaps).toEqual([])
+    expect(node(input, 'column', 'explicit')).toMatchObject({ nullable: true, sequential: true })
+    for (const name of ['implicit', 'defaulted', 'referenced'])
+      expect(node(input, 'column', name)).toMatchObject({ nullable: false, sequential: true })
+  })
+
   test.each(['postgresql', 'mysql', 'sqlite'])(
     'keeps quoted punctuation in %s identifiers',
     async (dialect) => {
