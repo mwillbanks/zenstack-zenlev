@@ -1,6 +1,6 @@
 {
   "name": "@mwillbanks/zenstack-zenlev",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A Bun-native migration system for ZenStack V3 with a reusable Kysely migration engine.",
   "type": "module",
   "packageManager": "bun@1.4.5",
