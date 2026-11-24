@@ -133,7 +133,7 @@ function validate(settings: Layer): void {
 export async function loadProjectConfig(
   overrides: ZenlevConfig = {},
   explicitConfig?: string,
-  options: { readonly loadClientModule?: boolean } = {},
+  options: { readonly loadClientModule?: boolean; readonly lintCatalogConnection?: boolean } = {},
 ): Promise<ResolvedProjectConfig> {
   const initialCwd = resolve(overrides.cwd ?? process.cwd())
   const packagePath = resolve(initialCwd, 'package.json')
@@ -144,7 +144,11 @@ export async function loadProjectConfig(
   const dedicated = dedicatedPath ? await dedicatedLayer(dedicatedPath) : {}
   const combined = merge(merge(fromPackage, dedicated), { ...overrides })
   validate(combined)
-  if (options.loadClientModule !== false && typeof combined.clientModule === 'string') {
+  if (
+    options.loadClientModule !== false &&
+    !(options.lintCatalogConnection && (combined.lint as ZenlevConfig['lint'])?.catalog?.connect) &&
+    typeof combined.clientModule === 'string'
+  ) {
     const owner =
       dedicated.clientModule !== undefined && dedicatedPath ? dedicatedPath : packagePath
     const modulePath = resolve(dirname(owner), combined.clientModule)

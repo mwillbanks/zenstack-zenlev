@@ -12,6 +12,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 - Add `lintPlugin()` and a final-plan write hook that can reject migration apply and schema push before user SQL executes.
 - Document lint adoption, catalog capabilities, rule configuration, custom plugins, and reviewed exceptions.
 
+### Fixed
+
+- Preserve constraint, index, and policy identities when checking planned changes against the database catalog.
+- Report gaps in column, constraint, and routine metadata without treating unknown values as policy violations.
+- Preserve schema definitions and object dependencies when diffing SQLite, PostgreSQL, and MySQL catalogs.
+
 ## [0.2.0] - 2026-11-23
 
 ### Added

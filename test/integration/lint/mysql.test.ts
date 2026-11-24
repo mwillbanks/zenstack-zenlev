@@ -39,6 +39,11 @@ describe.skipIf(mysqlUrl === undefined)('MySQL lint catalog', () => {
         namespaces: [namespace],
         store: { databaseName: namespace, tableName: 'internal_migrations' },
       })
+      const absent = await readBuiltinLintCatalog({ adapter, namespaces: ['zenlev_lint_absent'] })
+      expect(absent.nodes).toEqual([])
+      expect(absent.gaps).toContainEqual(
+        expect.objectContaining({ identity: 'zenlev_lint_absent' }),
+      )
       expect(result.gaps).toContainEqual(
         expect.objectContaining({ message: expect.stringContaining('metadata privileges') }),
       )

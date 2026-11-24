@@ -112,7 +112,7 @@ export async function postgresTable(
     db,
     sql`
     SELECT c.relname AS name, i.indisunique AS is_unique,
-      (i.indexprs IS NOT NULL OR i.indpred IS NOT NULL OR i.indnatts <> i.indnkeyatts OR am.amname <> 'btree'
+      (NOT i.indisvalid OR NOT i.indisready OR i.indexprs IS NOT NULL OR i.indpred IS NOT NULL OR i.indnatts <> i.indnkeyatts OR am.amname <> 'btree'
         OR EXISTS (SELECT 1 FROM unnest(i.indoption::smallint[]) flag WHERE flag <> 0)) AS complex,
       ARRAY(SELECT a.attname::text FROM unnest(i.indkey::smallint[]) WITH ORDINALITY k(attnum, ord)
         JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum ORDER BY k.ord) AS columns

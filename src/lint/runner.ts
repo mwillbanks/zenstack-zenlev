@@ -2,6 +2,7 @@ import Ajv from 'ajv'
 import { createHash } from 'node:crypto'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { identity as qualifiedIdentity } from '../identity'
 import { builtinPresets, builtinRules } from './rules'
 import type {
   LintConfig,
@@ -84,7 +85,7 @@ function identity(node: LintNode): string {
   if (node.identity) return node.identity
   const tableName = node.table === node.name ? undefined : node.table
   return (
-    [node.schema, tableName, node.name].filter((part) => part !== undefined).join('.') +
+    qualifiedIdentity(node.schema, ...(tableName === undefined ? [] : [tableName]), node.name) +
     (node.signature === undefined ? '' : '(' + node.signature + ')')
   )
 }

@@ -146,3 +146,25 @@ test('explicit join definitions support side ordering, templates, and key strate
   ).toHaveLength(0)
   expect(() => inspect('naming/join-table', [relation])).toThrow('joins')
 })
+
+test('physical identifier rules distinguish names from authored delimiters and anonymous nodes', () => {
+  const quoted = node('column', 'order_id', { spelling: '"order_id"', quoted: true })
+  const unquoted = node('column', 'orderid', { spelling: 'OrderId', quoted: false })
+  const schema = node('schema', 'app', { origin: 'catalog', schema: undefined })
+  const unnamed = node('check', 'CHECK', { generated: true, nameKnown: false })
+  expect(
+    inspect('naming/identifier', [quoted], { format: 'snake_case', maxLength: 8 }).reports,
+  ).toHaveLength(0)
+  expect(inspect('naming/identifier', [unquoted], { format: 'snake_case' }).reports).toHaveLength(1)
+  expect(inspect('naming/identifier', [quoted], { quoted: false }).reports).toHaveLength(1)
+  const ignored = inspect('naming/identifier', [schema, unnamed, node('anonymous-block', 'DO')], {
+    format: 'snake_case',
+    qualified: true,
+  })
+  expect(ignored.reports).toHaveLength(0)
+  expect(ignored.gaps).toHaveLength(0)
+  expect(inspect('naming/constraint', [unnamed], { explicit: true }).reports).toHaveLength(1)
+  expect(
+    inspect('naming/constraint', [{ ...index, generated: false }], { explicit: true }).gaps,
+  ).toHaveLength(0)
+})

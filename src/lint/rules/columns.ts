@@ -32,14 +32,21 @@ const requiredColumns = defineTableRule(
           report(context, node, 'Add required column ' + name + '.')
           continue
         }
-        if (required.type !== undefined && column.type !== required.type)
-          report(context, column, 'Use type ' + text(required.type) + ' for ' + name + '.')
-        if (required.nullable !== undefined && column.nullable !== required.nullable)
-          report(
-            context,
-            column,
-            'Set ' + name + ' nullability to ' + String(required.nullable) + '.',
-          )
+        if (required.type !== undefined) {
+          if (column.type === undefined) context.gap('Column type is unavailable.', column)
+          else if (column.type !== required.type)
+            report(context, column, 'Use type ' + text(required.type) + ' for ' + name + '.')
+        }
+        if (required.nullable !== undefined) {
+          if (column.nullable === undefined)
+            context.gap('Column nullability is unavailable.', column)
+          else if (column.nullable !== required.nullable)
+            report(
+              context,
+              column,
+              'Set ' + name + ' nullability to ' + String(required.nullable) + '.',
+            )
+        }
         if (required.default !== undefined && column.default !== required.default)
           report(context, column, 'Use the configured default for ' + name + '.')
       }
@@ -64,8 +71,11 @@ const columnConventions = defineRule(
       if (strings(config.forbiddenSuffixes).some((suffix) => node.name.endsWith(suffix)))
         report(context, node, 'Remove the prohibited column suffix.')
       const allowed = strings(config.allowedTypes)
-      if (allowed.length && node.type !== undefined && !allowed.includes(node.type))
-        report(context, node, 'Use a permitted column type: ' + allowed.join(', ') + '.')
+      if (allowed.length) {
+        if (node.type === undefined) context.gap('Column type is unavailable.', node)
+        else if (!allowed.includes(node.type))
+          report(context, node, 'Use a permitted column type: ' + allowed.join(', ') + '.')
+      }
     },
   }),
 )

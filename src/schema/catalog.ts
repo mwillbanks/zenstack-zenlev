@@ -57,6 +57,7 @@ export async function readCatalog(
         entry.name === table.name &&
         (entry.namespace === undefined || entry.namespace === table.namespace),
     )
+  let liveNamespaces = [...namespaces]
   let entries: LiveTable[]
   let enums: SchemaEnum[] = []
   if (dialect === 'sqlite') {
@@ -68,12 +69,18 @@ export async function readCatalog(
     `,
     )
   } else if (dialect === 'postgresql') {
+    liveNamespaces = (
+      await fetch<{ name: string }>(
+        db,
+        sql`SELECT nspname AS name FROM pg_catalog.pg_namespace WHERE nspname IN (${sql.join(namespaces)}) ORDER BY nspname`,
+      )
+    ).map(({ name }) => name)
     entries = await fetch(
       db,
       sql`
-      SELECT c.relname AS name, n.nspname AS namespace, c.oid::text AS key, c.relkind IN ('v','m') AS "isView"
+      SELECT c.relname AS name, n.nspname AS namespace, c.oid::text AS key, c.relkind IN ('v','m') AS "isView", c.relkind = 'f' AS "isForeign"
       FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname IN (${sql.join(namespaces)}) AND c.relkind IN ('r','p','v','m')
+      WHERE n.nspname IN (${sql.join(namespaces)}) AND c.relkind IN ('r','p','v','m','f')
       ORDER BY n.nspname, c.relname
     `,
     )
@@ -87,6 +94,12 @@ export async function readCatalog(
     `,
     )
   } else {
+    liveNamespaces = (
+      await fetch<{ name: string }>(
+        db,
+        sql`SELECT schema_name AS name FROM information_schema.schemata WHERE schema_name IN (${sql.join(namespaces)}) ORDER BY schema_name`,
+      )
+    ).map(({ name }) => name)
     entries = await fetch(
       db,
       sql`
@@ -102,6 +115,10 @@ export async function readCatalog(
   const tables: SchemaTable[] = []
   for (const entry of selected) {
     const table = { ...entry, isView: Boolean(entry.isView) }
+    if (table.isForeign) {
+      unsupported.push(diagnostic(table, 'is a foreign table'))
+      continue
+    }
     if (table.isView) {
       unsupported.push(diagnostic(table, 'is a view'))
       continue
@@ -118,5 +135,13 @@ export async function readCatalog(
         ),
       )
   }
-  return { dialect, sourcePath: '<database>', namespaces, tables, enums, unsupported, warnings: [] }
+  return {
+    dialect,
+    sourcePath: '<database>',
+    namespaces: liveNamespaces,
+    tables,
+    enums,
+    unsupported,
+    warnings: [],
+  }
 }

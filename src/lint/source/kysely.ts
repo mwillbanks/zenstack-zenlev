@@ -20,9 +20,11 @@ export function readKyselyBuilder(
     const chainOf = (expression: import('typescript-ast').Expression) => {
       const calls: Call[] = []
       let root = expression
+      while (ts.isParenthesizedExpression(root)) root = root.expression
       while (ts.isCallExpression(root) && ts.isPropertyAccessExpression(root.expression)) {
         calls.unshift(root)
         root = root.expression.expression
+        while (ts.isParenthesizedExpression(root)) root = root.expression
       }
       return { calls, root }
     }
@@ -87,6 +89,7 @@ export function readKyselyBuilder(
     }
     const modifiers = (callback: import('typescript-ast').Expression | undefined): Call[] => {
       if (!callback) return []
+      while (ts.isParenthesizedExpression(callback)) callback = callback.expression
       if (
         (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) ||
         ts.isBlock(callback.body)
@@ -204,6 +207,7 @@ export function readKyselyBuilder(
       let target: string | undefined
       let columns: string[] | undefined
       let unique = false
+      let incomplete = false
       for (const call of chain.slice(1)) {
         const name = methodOf(call)
         if (name === 'on') target = staticString(ts, call.arguments[0])
@@ -212,9 +216,12 @@ export function readKyselyBuilder(
           if (column) (columns ??= []).push(column)
         } else if (name === 'columns') columns = strings(call.arguments[0])
         else if (name === 'unique') unique = true
-        else if (name !== 'ifNotExists')
+        else if (name !== 'ifNotExists') {
+          incomplete = true
           gap(call, 'Kysely index modifier is outside static analysis: ' + name)
+        }
       }
+      if (incomplete) return true
       if (target && columns?.length)
         query =
           'CREATE ' +

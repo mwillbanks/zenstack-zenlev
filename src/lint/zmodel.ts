@@ -9,11 +9,13 @@ import {
   literal,
   mapped,
   nativeType,
+  projectResolvedZModel,
   references,
   type LoadSchemaOptions,
   type ResolvedZModel,
 } from '../schema/model'
 import type { LintInput, LintNode, LintSource } from './types'
+import { identity } from '../identity'
 
 function location(node: AstNode, fallback: string, hashes: WeakMap<object, string>): LintSource {
   const cst = node.$cstNode
@@ -49,7 +51,9 @@ export async function readZModelLintInput(
   return loaded ? inspectResolvedZModel(loaded) : { nodes: [], gaps: [] }
 }
 
-export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInput {
+export function inspectResolvedZModel(loaded: ResolvedZModel): LintInput {
+  const { model, path } = loaded
+  const projected = projectResolvedZModel(loaded)
   const dialect = getDataSourceProvider(model)
   const types =
     dialect === 'sqlite' || dialect === 'postgresql' || dialect === 'mysql'
@@ -58,10 +62,24 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
   const hashes = new WeakMap<object, string>()
   const nodes: LintNode[] = []
   const gaps: LintInput['gaps'][number][] = []
-  const namespace = (target: DataModel) =>
+  const namespace = (target: { attributes: DataModel['attributes'] }) =>
     literal(attr(target, '@@schema'), 'map') ?? (dialect === 'postgresql' ? 'public' : undefined)
   const emit = (node: AstNode, evidence: Omit<LintNode, 'source' | 'origin'>) =>
-    nodes.push({ ...evidence, dialect, source: location(node, path, hashes), origin: 'zmodel' })
+    nodes.push({
+      ...evidence,
+      identity:
+        evidence.identity ??
+        identity(
+          evidence.schema,
+          ...(evidence.table && !['table', 'view', 'model'].includes(evidence.kind)
+            ? [evidence.table]
+            : []),
+          evidence.name,
+        ),
+      dialect,
+      source: location(node, path, hashes),
+      origin: 'zmodel',
+    })
 
   const schemas = new Set<string>()
   for (const declaration of model.declarations) {
@@ -69,12 +87,14 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
       emit(attr(declaration, '@@map') ?? declaration, {
         kind: 'enum',
         name: mapped(declaration, declaration.name, true),
+        schema: namespace(declaration),
       })
       for (const field of declaration.fields)
         emit(attr(field, '@map') ?? field, {
           kind: 'enum-value',
           name: mapped(field, field.name),
-          table: declaration.name,
+          table: mapped(declaration, declaration.name, true),
+          schema: namespace(declaration),
         })
     }
     if (!isDataModel(declaration) || attr(declaration, '@@ignore')) continue
@@ -104,11 +124,14 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
       ? mapFields(references(arg(composite, 'fields')))
       : fieldIds.map((field) => mapped(field, field.name))
     if (!declaration.isView && primary.length) {
-      const explicitName = literal(composite, 'map')
+      const explicitName =
+        literal(composite, 'map') ??
+        literal(fieldIds[0] ? attr(fieldIds[0], '@id') : undefined, 'map')
       emit(composite ?? attr(fieldIds[0]!, '@id') ?? declaration, {
         ...scope,
         kind: 'primary-key',
-        name: explicitName ?? table + '_pkey',
+        name: explicitName ?? (dialect === 'postgresql' ? table + '_pkey' : 'PRIMARY'),
+        nameKnown: explicitName !== undefined || dialect === 'postgresql' || dialect === 'mysql',
         explicit: explicitName !== undefined,
         columns: primary,
       })
@@ -122,6 +145,7 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
           ...scope,
           kind: name === '@@unique' ? 'unique' : 'index',
           name: indexName ?? table,
+          nameKnown: indexName !== undefined,
           explicit: indexName !== undefined,
           unique: name === '@@unique',
           columns: mapFields(references(arg(attribute, 'fields'))),
@@ -135,7 +159,7 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
           emit(attribute, {
             ...scope,
             kind: 'zenstack-policy',
-            identity: [schema, table, name + '#' + (index + 1)].filter(Boolean).join('.'),
+            identity: identity(schema, table, name + '#' + (index + 1)),
             name,
             command,
             permissive: name === '@@allow',
@@ -160,6 +184,7 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
             ...scope,
             kind: 'foreign-key',
             name: name ?? field.name,
+            nameKnown: name !== undefined,
             explicit: name !== undefined,
             columns: mapFields(local),
             targetTable: mapped(target, target.name, true),
@@ -176,7 +201,7 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
         ) {
           gaps.push({
             source: location(field, path, hashes),
-            identity: schema ? schema + '.' + table : table,
+            identity: identity(schema, table),
             message: 'Inspect the generated join table in the live catalog',
           })
         }
@@ -188,15 +213,38 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
       const type =
         (native && nativeType(native)) ??
         (target && isEnum(target)
-          ? mapped(target, target.name, true)
+          ? dialect === 'sqlite'
+            ? 'text'
+            : dialect === 'mysql'
+              ? 'enum(' +
+                target.fields
+                  .map((item) => "'" + mapped(item, item.name).replaceAll("'", "''") + "'")
+                  .join(',') +
+                ')'
+              : mapped(target, target.name, true)
           : types[field.type.type ?? ''])
+      const projectedColumn = projected.tables
+        .find((item) => item.name === table && item.namespace === schema)
+        ?.columns.find((item) => item.name === name)
       const expression = arg(attr(field, '@default'), 'value')
       const invocation = expression?.$type === 'InvocationExpr' ? expression : undefined
       const generator = invocation?.function.$refText
       const databaseDefault =
         generator === 'dbgenerated' ? getLiteral(invocation?.args[0]?.value) : undefined
-      const defaultValue =
-        typeof databaseDefault === 'string' ? databaseDefault : expression?.$cstNode?.text
+      const persisted = projectedColumn?.default
+      const defaultValue = persisted
+        ? persisted.kind === 'sql'
+          ? persisted.sql
+          : typeof persisted.value === 'string'
+            ? "'" + persisted.value.replaceAll("'", "''") + "'"
+            : String(persisted.value)
+        : generator === 'now'
+          ? 'CURRENT_TIMESTAMP'
+          : typeof databaseDefault === 'string'
+            ? databaseDefault
+            : generator
+              ? undefined
+              : expression?.$cstNode?.text
       const sequential =
         generator === 'autoincrement' ||
         (dialect === 'sqlite' &&
@@ -211,7 +259,7 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
         kind: 'column',
         name,
         logicalName: field.name,
-        type,
+        type: projectedColumn?.type ?? type,
         default: defaultValue,
         nullable: field.type.optional,
         sequential,
@@ -224,6 +272,7 @@ export function inspectResolvedZModel({ model, path }: ResolvedZModel): LintInpu
           ...scope,
           kind: 'unique',
           name: uniqueName ?? name,
+          nameKnown: uniqueName !== undefined,
           columns: [name],
           explicit: uniqueName !== undefined,
           unique: true,

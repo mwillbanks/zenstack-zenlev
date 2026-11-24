@@ -5,6 +5,7 @@ const rlsState = node('rls', 'orders', { table: 'orders', enabled: true, forced:
 const policy = node('policy', 'tenant_policy', {
   table: 'orders',
   command: 'all',
+  permissive: true,
   roles: ['app_role'],
   using: "tenant_id = current_setting('app.tenant')",
   check: null,
@@ -181,5 +182,22 @@ test('separate ZenStack policy identities preserve every authored declaration', 
   const scoped = { ...broad, identity: 'orders.allow.1', using: 'auth() != null' }
   expect(
     inspect('zenstack/policies', [model, broad, scoped], { noBroad: true }).reports,
+  ).toHaveLength(1)
+})
+
+test('RLS applies kind selectors and recognizes boolean casts without guessing ALTER policy mode', () => {
+  const cast = { ...policy, using: 'CAST((TRUE::pg_catalog.bool) AS boolean)' }
+  const rules = { kinds: ['policy'], noBroad: true }
+  expect(inspect('postgres/rls', [table, rlsState, cast], rules).reports).toHaveLength(1)
+  expect(
+    inspect('postgres/rls', [table, rlsState, { ...cast, using: 'TRUE AND is_member' }], rules)
+      .reports,
+  ).toHaveLength(0)
+  const altered = { ...policy, action: 'alter' as const, permissive: undefined }
+  const commands = { commands: ['select'], roles: ['app_role'] }
+  expect(inspect('postgres/rls', [table, rlsState, altered], commands).gaps).toHaveLength(1)
+  expect(
+    inspect('postgres/rls', [table, rlsState, { ...policy, permissive: false }, altered], commands)
+      .reports,
   ).toHaveLength(1)
 })

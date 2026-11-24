@@ -42,6 +42,8 @@ export interface LintNode {
   readonly quoted?: boolean | undefined
   readonly generated?: boolean | undefined
   readonly explicit?: boolean | undefined
+  readonly nameKnown?: boolean | undefined
+  readonly checksKnown?: boolean | undefined
   readonly columns?: readonly string[] | undefined
   readonly type?: string | undefined
   readonly default?: string | undefined

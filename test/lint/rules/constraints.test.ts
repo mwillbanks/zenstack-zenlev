@@ -30,3 +30,25 @@ test('required table CHECK constraints match configured names', () => {
     inspect('constraints/required-check', [table, check], { names: ['other'] }).reports,
   ).toHaveLength(1)
 })
+
+test('required CHECK rules distinguish missing checks from incomplete metadata', () => {
+  const partial = { ...table, checksKnown: false }
+  const unavailable = inspect('constraints/required-check', [partial])
+  expect(unavailable.reports).toHaveLength(0)
+  expect(unavailable.gaps).toHaveLength(1)
+  const check = node('check', '', { table: 'orders', nameKnown: false })
+  expect(inspect('constraints/required-check', [partial, check]).gaps).toHaveLength(0)
+  const unavailableName = inspect('constraints/required-check', [table, check], {
+    names: ['total'],
+  })
+  expect(unavailableName.reports).toHaveLength(0)
+  expect(unavailableName.gaps).toHaveLength(1)
+})
+
+test('foreign key indexes are checked for every unnamed foreign key', () => {
+  const first = { ...fk, name: '' }
+  const second = { ...first, columns: ['account_id'], targetTable: 'accounts' }
+  const result = inspect('keys/foreign-key-index', [table, second, first, index])
+  expect(result.reports).toHaveLength(1)
+  expect(result.messages[0]).toContain('account_id')
+})

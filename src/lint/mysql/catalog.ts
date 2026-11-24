@@ -14,8 +14,15 @@ export async function mysql(
   namespaces: readonly string[] | undefined,
 ): Promise<LintInput> {
   const current = await rows(db, sql<{ name: string | null }>`SELECT DATABASE() AS name`)
-  const selected = namespaces ?? (current[0]?.name ? [current[0].name] : [])
-  if (selected.length === 0) throw new Error('Live lint requires a selected MySQL database')
+  const requested = namespaces ?? (current[0]?.name ? [current[0].name] : [])
+  if (requested.length === 0) throw new Error('Live lint requires a selected MySQL database')
+  const visible = await rows(
+    db,
+    sql<{
+      name: string
+    }>`SELECT SCHEMA_NAME AS name FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME`,
+  )
+  const selected = requested.filter((name) => visible.some((schema) => schema.name === name))
   const nodes: LintNode[] = selected.map((name) => node('mysql', 'schema', name))
   const gaps: LintGap[] = [
     {
@@ -23,6 +30,10 @@ export async function mysql(
         'MySQL INFORMATION_SCHEMA only exposes metadata visible to the current account. Audit completeness requires metadata privileges for every selected database.',
     },
   ]
+  for (const name of requested)
+    if (!selected.includes(name))
+      gaps.push({ message: 'Configured MySQL database is absent or unavailable', identity: name })
+  if (selected.length === 0) return { nodes, gaps, capabilities: ['schemas'] }
   const tables = await rows(
     db,
     sql<{ schema: string; name: string; kind: string }>`

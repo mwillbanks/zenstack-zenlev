@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { Kysely } from 'kysely'
 import { createKyselyAdapter, lintProject, type LintConfig } from '../../src'
 import { createBunSqliteDialect } from '../fixtures/sqlite'
+import { identity } from '../../src/lint/catalog/shared'
+import { readBuiltinLintCatalog } from '../../src/lint/catalog'
 
 let cwd: string
 let sqlite: Database
@@ -58,8 +60,27 @@ test('audits SQLite rowid, CHECK names, index and view catalogs through a borrow
   expect(sqlite.query('SELECT count(*) AS count FROM "WrongTable"').get()).toEqual({ count: 0 })
 })
 
+test('keeps quoted qualified identities distinct', () => {
+  expect(identity('app', 'a.b', 'c')).toBe('app."a.b".c')
+  expect(identity('app', 'a', 'b.c')).toBe('app.a."b.c"')
+  expect(identity(undefined, 'a"b')).toBe('"a""b"')
+})
+
 test('reports unsupported SQLite catalog DDL against the table identity', async () => {
-  sqlite.exec("CREATE TABLE 'legacy_items' (id TEXT PRIMARY KEY)")
+  sqlite.exec(
+    "CREATE TABLE 'legacy_items' (id TEXT CONSTRAINT named_pk PRIMARY KEY, parent TEXT CONSTRAINT named_fk REFERENCES legacy_items(id), CONSTRAINT named_check CHECK (length(id) > 0))",
+  )
+  const catalog = await readBuiltinLintCatalog({ adapter: createKyselyAdapter(db, 'sqlite') })
+  expect(
+    catalog.nodes.find((node) => node.kind === 'table' && node.name === 'legacy_items')
+      ?.checksKnown,
+  ).toBe(false)
+  for (const kind of ['primary-key', 'foreign-key']) {
+    const key = catalog.nodes.find((node) => node.kind === kind && node.table === 'legacy_items')!
+    expect(key.nameKnown).toBe(false)
+    expect(key.explicit).toBeUndefined()
+    expect(key.generated).toBeUndefined()
+  }
   const result = await lintProject(
     { cwd, adapter: createKyselyAdapter(db, 'sqlite'), lint: { presets: [] } },
     { live: true },
@@ -85,8 +106,9 @@ test('uses custom catalog capabilities and disposes custom connections after fai
       throw new Error('catalog connection failed')
     },
   }
+  await Bun.write(join(cwd, 'custom.json'), JSON.stringify({ clientModule: './missing-client.ts' }))
   await expect(
-    lintProject({ cwd, env: 'qa', lint: { catalog: provider } }, { live: true }),
+    lintProject({ cwd, env: 'qa', lint: { catalog: provider } }, { live: true }, 'custom.json'),
   ).rejects.toThrow('catalog connection failed')
   expect(disposed).toEqual(['qa'])
   const adapter = createKyselyAdapter(db, 'sqlite')

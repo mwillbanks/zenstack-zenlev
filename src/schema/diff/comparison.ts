@@ -1,8 +1,9 @@
+import { identity } from '../../identity'
 import type { Dialect } from '../../types'
 import type { ColumnDefault, SchemaColumn, SchemaForeignKey, SchemaIndex } from '../model'
 
 export function key(item: { readonly name: string; readonly namespace?: string }): string {
-  return item.namespace ? item.namespace + '.' + item.name : item.name
+  return identity(item.namespace, item.name)
 }
 
 export function compare(a: string, b: string): number {
@@ -18,7 +19,10 @@ export function physicalType(type: string, dialect: Dialect): string {
   if (dialect === 'mysql')
     return normalized.replace(/^integer\b/, 'int').replace(/^(boolean|bool)$/, 'tinyint(1)')
   if (dialect === 'postgresql')
-    return normalized.replace(/^decimal\b/, 'numeric').replace(/ without time zone$/, '')
+    return normalized
+      .replace(/^decimal\b/, 'numeric')
+      .replace(/^character varying\b/, 'varchar')
+      .replace(/ without time zone$/, '')
   return normalized
 }
 
@@ -27,6 +31,8 @@ export function comparableDefault(
   dialect: Dialect,
 ): ColumnDefault | undefined {
   const value = column.default
+  if (dialect === 'mysql' && column.nullable && value?.kind === 'literal' && value.value === null)
+    return undefined
   if (dialect === 'mysql' && value?.kind === 'sql') {
     const timestamp = /^current_timestamp(?:\((\d+)\))?$/i.exec(value.sql.trim())
     if (timestamp) {
@@ -41,7 +47,10 @@ export function comparableDefault(
 
 export function enumKey(column: SchemaColumn): string | undefined {
   return column.enumName
-    ? (column.enumNamespace ? column.enumNamespace + '.' : '') + column.enumName
+    ? key({
+        name: column.enumName,
+        ...(column.enumNamespace ? { namespace: column.enumNamespace } : {}),
+      })
     : undefined
 }
 

@@ -131,11 +131,13 @@ export async function apply(
         const migration = local.get(identity.id)!
         const reversals = await loadReversals(migration, graph, local, context)
         for (const reversal of reversals) {
-          const { up: _up, down: _down, ...reversalIdentity } = reversal
+          const { up: _up, down: _down, custom: _custom, ...reversalIdentity } = reversal
           handlers.push({ migration: reversalIdentity, direction: 'down' })
         }
-        if (!migration.baseline || baselineMode(graph, migration) === 'bootstrap')
-          handlers.push({ migration: identity, direction: 'up' })
+        if (!migration.baseline || baselineMode(graph, migration) === 'bootstrap') {
+          const { custom: _custom, ...writeIdentity } = identity
+          handlers.push({ migration: writeIdentity, direction: 'up' })
+        }
       }
     }
     const diagnostics = await plugins.beforeWrite(

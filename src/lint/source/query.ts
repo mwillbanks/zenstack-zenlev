@@ -9,10 +9,22 @@ export function extractQueryCalls(
   make: EmitNode,
   gaps: LintGap[],
 ): void {
-  if (['select', 'insert', 'update', 'delete', 'with'].includes(action ?? '')) {
+  if (
+    [
+      'select',
+      'insert',
+      'update',
+      'delete',
+      'with',
+      'merge',
+      'replace',
+      'values',
+      'table',
+    ].includes(action ?? '')
+  ) {
     for (let index = 1; index < tokens.length; index++) {
       const target = identifier(tokens, index)
-      if (!target || tokens[target.end]?.value !== '(') continue
+      if (!target || !keyword(tokens[target.end], '(')) continue
       const previous = tokens[index - 1]
       if (
         previous?.value === ':' ||
@@ -23,6 +35,16 @@ export function extractQueryCalls(
       if (target.schema) make('function', target, { action: 'call' })
       else {
         const syntax = [
+          'COUNT',
+          'SUM',
+          'AVG',
+          'MIN',
+          'MAX',
+          'LOWER',
+          'UPPER',
+          'LENGTH',
+          'ABS',
+          'ROUND',
           'CAST',
           'EXTRACT',
           'COALESCE',
@@ -74,6 +96,7 @@ export function extractQueryCalls(
           ) ||
           [
             'SELECT',
+            'CASE',
             'DISTINCT',
             'WHERE',
             'HAVING',
@@ -94,8 +117,8 @@ export function extractQueryCalls(
         let close = target.end
         let depth = 0
         for (; close < tokens.length; close++) {
-          if (tokens[close]?.value === '(') depth++
-          if (tokens[close]?.value === ')' && --depth === 0) break
+          if (keyword(tokens[close], '(')) depth++
+          if (keyword(tokens[close], ')') && --depth === 0) break
         }
         if (
           expressionStart &&

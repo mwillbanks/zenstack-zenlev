@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { definePlugin, type WritePlan, type WriteProject } from '../plugins'
+import { identity } from '../identity'
 import { readLintCatalog } from './live'
 import { createLintRunner } from './runner'
 import { parseSqlLintInput, readMigrationLintInputs } from './source'
@@ -38,12 +39,12 @@ async function plannedInputs(
   const affected = new Set(plan.affected)
   const tables = new Set(
     plan.desired.tables
-      .filter(({ name, namespace }) => affected.has(namespace ? namespace + '.' + name : name))
+      .filter(({ name, namespace }) => affected.has(identity(namespace, name)))
       .map(({ name }) => name),
   )
   const nodes = schema.nodes.filter((node) => {
     if (!node.table) return false
-    const qualified = node.schema ? node.schema + '.' + node.table : node.table
+    const qualified = identity(node.schema, node.table)
     return affected.has(qualified) || (adapter.dialect === 'mysql' && tables.has(node.table))
   })
   const gaps = []
@@ -63,10 +64,29 @@ function resolveWriteNamespaces(
   nodes: readonly LintNode[],
   catalog: LintInput,
 ): readonly LintNode[] {
-  const schema = catalog.defaultSchema
-  if (!schema) return nodes
+  const indexes = new Map<string, LintNode>()
+  for (const node of catalog.nodes)
+    if (node.kind === 'index') indexes.set(identity(node.schema, node.name), node)
+
   return nodes.map((node) => {
+    const schema = node.schema ?? catalog.defaultSchema
+    if (node.kind === 'index') {
+      // PostgreSQL and SQLite DROP INDEX identify an index by schema and name.
+      const key = identity(schema, node.name)
+      const table = node.table ?? indexes.get(key)?.table
+      const resolved = table
+        ? { ...node, schema, table, identity: identity(schema, table, node.name) }
+        : { ...node, schema, identity: key }
+      if (node.action === 'drop') indexes.delete(key)
+      else indexes.set(key, resolved)
+      return resolved
+    }
+    if (node.kind === 'table' && node.action === 'drop') {
+      for (const [key, index] of indexes)
+        if (index.schema === schema && index.table === node.name) indexes.delete(key)
+    }
     if (
+      !schema ||
       node.schema ||
       ['schema', 'extension', 'event-trigger', 'anonymous-block'].includes(node.kind)
     )
@@ -74,7 +94,7 @@ function resolveWriteNamespaces(
     return {
       ...node,
       schema,
-      identity: node.identity ? schema + '.' + node.identity : undefined,
+      identity: node.identity ? identity(undefined, schema) + '.' + node.identity : undefined,
       targetSchema: node.targetSchema ?? (node.targetTable ? schema : undefined),
     }
   })

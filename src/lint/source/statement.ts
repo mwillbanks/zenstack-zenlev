@@ -1,4 +1,5 @@
 import type { LintInput, LintNode, LintSource, LintGap } from '../types'
+import { identity } from '../../identity'
 import { tableDefinitions } from './definitions'
 import { extractQueryCalls } from './query'
 import {
@@ -31,11 +32,12 @@ export function extractStatement(
       name: item.name,
       dialect,
       schema: item.schema,
-      identity: [item.schema, item.name].filter(Boolean).join('.'),
+      identity: identity(item.schema, item.name),
       source: sourceAt(source, text, item.token.start, item.token.end),
       origin: 'sql',
       spelling: item.token.text,
       quoted: item.token.quoted,
+      explicit: true,
       action: action as LintNode['action'],
       ...values,
     }
@@ -100,12 +102,18 @@ export function extractStatement(
     const lang = position(tokens, 'LANGUAGE')
     const security = position(tokens, 'SECURITY')
     const path = position(tokens, 'SEARCH_PATH')
-    const signature =
-      tokens[item.end]?.value === '('
-        ? groups(tokens, item.end)
-            .map((argument) => words(argument))
-            .join(',')
-        : undefined
+    const signature = keyword(tokens[item.end], '(')
+      ? groups(tokens, item.end)
+          .map((argument) => words(argument))
+          .join(',')
+      : undefined
+    const pathSeparator = keyword(tokens[path + 1], '=') || keyword(tokens[path + 1], 'TO')
+    const pathTokens = tokens.slice(path + (pathSeparator ? 2 : 1))
+    const pathEnd = pathTokens.findIndex((token) =>
+      ['AS', 'LANGUAGE', 'SECURITY', 'SET', 'RESET', 'RETURN', 'BEGIN'].some((word) =>
+        keyword(token, word),
+      ),
+    )
     Object.assign(node, {
       signature,
       identity: signature === undefined ? node.identity : node.identity + '(' + signature + ')',
@@ -121,9 +129,9 @@ export function extractStatement(
           ? { searchPath: [] }
           : {}
         : {
-            searchPath: tokens
-              .slice(path + 2)
-              .filter((token) => token.value !== ',')
+            searchPath: pathTokens
+              .slice(0, pathEnd < 0 ? undefined : pathEnd)
+              .filter((token) => !keyword(token, ','))
               .map((token) => token.value),
           }),
     })
@@ -149,15 +157,15 @@ export function extractStatement(
     const on = identifier(tokens, position(tokens, 'ON') + 1)
     const forIndex = position(tokens, 'FOR')
     const to = position(tokens, 'TO')
-    const using = position(tokens, 'USING')
+    const usingIndex = position(tokens, 'USING')
     const check = position(tokens, 'CHECK')
     const predicate = (index: number) => words(groups(tokens, index + 1).flat())
     const predicates: Partial<LintNode> = {}
-    if (using >= 0) Object.assign(predicates, { using: predicate(using) })
+    if (usingIndex >= 0) Object.assign(predicates, { using: predicate(usingIndex) })
     else if (action === 'create') Object.assign(predicates, { using: null })
     if (check >= 0) Object.assign(predicates, { check: predicate(check) })
     else if (action === 'create') Object.assign(predicates, { check: null })
-    const endRoles = [using, check < 0 ? -1 : check - 1]
+    const endRoles = [usingIndex, check < 0 ? -1 : check - 1]
       .filter((index) => index > to)
       .sort((a, b) => a - b)[0]
     Object.assign(node, {
@@ -178,8 +186,8 @@ export function extractStatement(
                     .map((token) => token.value),
           }),
       ...predicates,
-      permissive: position(tokens, 'RESTRICTIVE') < 0,
-      identity: [on?.schema, on?.name, item.name].filter(Boolean).join('.'),
+      ...(action === 'create' ? { permissive: position(tokens, 'RESTRICTIVE') < 0 } : {}),
+      identity: identity(on?.schema, ...(on ? [on.name] : []), item.name),
     })
   }
   if (kind === 'table') {
@@ -192,7 +200,22 @@ export function extractStatement(
       gaps,
       make,
     )
-    if (action === 'create') extractTable()
+    if (action === 'create') {
+      extractTable()
+      const asIndex = position(tokens, 'AS')
+      if (
+        asIndex >= 0 &&
+        ['SELECT', 'WITH', 'TABLE', 'VALUES'].some((word) => keyword(tokens[asIndex + 1], word))
+      )
+        extractQueryCalls(
+          tokens[asIndex + 1]?.value.toLowerCase(),
+          text,
+          tokens.slice(asIndex + 1),
+          source,
+          make,
+          gaps,
+        )
+    }
     if (action === 'alter') {
       const row = position(tokens, 'ROW')
       if (row >= 0 && keyword(tokens[row + 1], 'LEVEL') && keyword(tokens[row + 2], 'SECURITY')) {
@@ -207,10 +230,15 @@ export function extractStatement(
       } else {
         const add = position(tokens, 'ADD')
         if (add >= 0) {
-          const definition = tokens
-            .slice(add + 1)
-            .filter((token, index) => index !== 0 || !keyword(token, 'COLUMN'))
-          extractDefinition(definition)
+          let start = add + 1
+          if (keyword(tokens[start], 'COLUMN')) start++
+          if (
+            keyword(tokens[start], 'IF') &&
+            keyword(tokens[start + 1], 'NOT') &&
+            keyword(tokens[start + 2], 'EXISTS')
+          )
+            start += 3
+          extractDefinition(tokens.slice(start))
         } else
           gaps.push({
             message: 'ALTER TABLE state changes require catalog or manual review.',
@@ -222,10 +250,13 @@ export function extractStatement(
   }
   if (kind === 'index') {
     const on = position(tokens, 'ON')
-    const target = identifier(tokens, on + 1)
+    const target = on >= 0 ? identifier(tokens, on + 1) : undefined
     Object.assign(node, {
+      identity: target
+        ? identity(target.schema ?? item.schema, target.name, item.name)
+        : node.identity,
       table: target?.name,
-      schema: target?.schema,
+      schema: target?.schema ?? item.schema,
       columns: columnList(tokens, target?.end ?? tokens.length),
       unique: position(tokens.slice(0, typeIndex), 'UNIQUE') >= 0,
       partial: position(tokens, 'WHERE') >= 0,

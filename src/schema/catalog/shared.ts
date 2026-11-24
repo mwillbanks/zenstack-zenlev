@@ -5,6 +5,7 @@ export type Catalog = Kysely<any>
 export type TableName = { readonly name: string; readonly namespace?: string | undefined }
 export type LiveTable = TableName & {
   readonly isView: boolean
+  readonly isForeign?: boolean
   readonly key: string
   readonly definition?: string
 }
@@ -29,6 +30,11 @@ export function literalDefault(value: string | null): ColumnDefault | undefined 
   if (/^(true|false)$/i.test(castless))
     return { kind: 'literal', value: castless.toLowerCase() === 'true' }
   if (/^null$/i.test(castless)) return { kind: 'literal', value: null }
+  const hexadecimal = /^([+-]?)(0x[0-9a-f]{1,16})$/i.exec(castless)
+  if (hexadecimal) {
+    const integer = Number(BigInt.asIntN(64, BigInt(hexadecimal[2]!)))
+    return { kind: 'literal', value: hexadecimal[1] === '-' ? -integer : integer }
+  }
   if (/^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(castless) && Number.isFinite(Number(castless))) {
     return { kind: 'literal', value: Number(castless) }
   }

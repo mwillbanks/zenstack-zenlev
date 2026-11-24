@@ -99,7 +99,7 @@ export function identifier(
   | undefined {
   const first = tokens[start]
   if (!first || (!first.quoted && !/^[\p{L}_\p{N}]/u.test(first.text))) return
-  if (tokens[start + 1]?.value === '.' && tokens[start + 2]) {
+  if (keyword(tokens[start + 1], '.') && tokens[start + 2]) {
     return {
       name: tokens[start + 2]!.value,
       schema: first.value,
@@ -115,29 +115,44 @@ export function groups(tokens: readonly Token[], start: number): Token[][] {
   let depth = 0
   let group: Token[] = []
   for (const token of tokens.slice(start + 1)) {
-    if (token.value === ')' && depth === 0) {
+    if (keyword(token, ')') && depth === 0) {
       if (group.length) result.push(group)
       break
     }
-    if (token.value === ',' && depth === 0) {
+    if (keyword(token, ',') && depth === 0) {
       result.push(group)
       group = []
       continue
     }
-    if (token.value === '(') depth++
-    if (token.value === ')') depth--
+    if (keyword(token, '(')) depth++
+    if (keyword(token, ')')) depth--
     group.push(token)
   }
   return result
 }
 
 export function columnList(tokens: readonly Token[], start: number): string[] {
-  const opening = tokens.findIndex((token, index) => index >= start && token.value === '(')
+  const opening = tokens.findIndex((token, index) => index >= start && keyword(token, '('))
   return opening < 0
     ? []
     : groups(tokens, opening)
         .map((group) => group[0]?.value ?? '')
         .filter(Boolean)
+}
+
+/** Tokens outside expression groups, preserving their original offsets. */
+export function topLevel(tokens: readonly Token[]): Token[] {
+  let depth = 0
+  return tokens.filter((token) => {
+    if (keyword(token, ')')) depth--
+    const outside = depth === 0
+    if (keyword(token, '(')) depth++
+    return outside
+  })
+}
+
+export function typeName(tokens: readonly Token[]): string {
+  return words(tokens).replace(/\s*([(),.[\]])\s*/g, '$1')
 }
 
 export type EmitNode = (

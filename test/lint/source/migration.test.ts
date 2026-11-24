@@ -25,6 +25,43 @@ async function migration(
 }
 
 describe('migration source inspection', () => {
+  test('retains modifiers through parentheses and omits incomplete index evidence', async () => {
+    const input = await migration(
+      "export async function up(ctx) { await ctx.db.schema.createTable('users').addColumn('id', 'integer', (c => ((c.primaryKey()).notNull()))).execute(); await ctx.db.schema.createIndex('partial_idx').on('users').column('id').where('id', '>', 1).execute(); }",
+    )
+    expect(node(input, 'column', 'id')).toMatchObject({ sequential: true, nullable: false })
+    expect(input.nodes.filter((item) => item.kind === 'index')).toEqual([])
+    expect(input.gaps).toContainEqual(
+      expect.objectContaining({
+        message: 'Kysely index modifier is outside static analysis: where',
+      }),
+    )
+  })
+
+  test('inspects static SQL fragments and warns for opaque value-position fragments', async () => {
+    const input = await migration(
+      "import { sql } from 'kysely'; export async function up(ctx) { await sql\x60SELECT \x24{(sql.raw('app.hidden_fn()'))} WHERE id = \x24{ctx.id}\x60.execute(ctx.db.kysely); await sql\x60SELECT \x24{sql\x60app.other_fn()\x60}\x60.execute(ctx.db.kysely); await sql\x60SELECT * FROM users WHERE id = \x24{sql.raw(ctx.fragment)}\x60.execute(ctx.db.kysely); await sql\x60SELECT * FROM users WHERE id = \x24{helper()}\x60.execute(ctx.db.kysely); }",
+      'postgresql',
+    )
+    expect(
+      input.nodes.filter((item) => item.kind === 'function').map((item) => item.identity),
+    ).toEqual(['app.hidden_fn', 'app.other_fn'])
+    expect(
+      input.gaps.filter((gap) => gap.message === 'Dynamic SQL structure cannot be analyzed.'),
+    ).toHaveLength(2)
+  })
+
+  test('reports module initialization effects while preserving safe generated metadata', async () => {
+    const input = await migration(
+      "export const id = 'example'; export const dependsOn = ['prior']; const unused = () => helper(); const sideEffect = runDdl(); const nested = { effect: start() }; export async function up(ctx) {}",
+    )
+    expect(input.nodes).toEqual([])
+    expect(input.gaps.map((gap) => gap.message)).toEqual([
+      'Top-level migration initialization may execute before lint enforcement.',
+      'Top-level migration initialization may execute before lint enforcement.',
+    ])
+  })
+
   test('never imports modules and respects handler direction', async () => {
     const input = await migration(
       "import { sql as query } from 'kysely'; throw new Error('must never run'); export async function up(ctx) { await query.raw('CREATE TABLE users (id text PRIMARY KEY)').execute(ctx.db.kysely) } export async function down(ctx) { await query.raw('DROP TABLE users').execute(ctx.db.kysely) }",
@@ -198,6 +235,22 @@ describe('migration source inspection', () => {
     expect(indirect.gaps[0]?.message).toContain('implementation cannot be inspected')
     const local = await migration('function up() {} export {up};', 'sqlite', ['up', 'down'])
     expect(local.gaps).toEqual([])
+  })
+  test('reports incomplete Kysely index operations as coverage gaps', async () => {
+    const result = await migration(
+      `
+      export async function up(ctx) {
+        await ctx.db.schema.dropIndex('old_idx').execute()
+        await ctx.db.schema.createIndex('new_idx').on('items').execute()
+      }
+    `,
+      'mysql',
+    )
+    expect(result.nodes).toEqual([])
+    expect(result.gaps.map(({ message }) => message)).toEqual([
+      'MySQL DROP INDEX requires a statically known table.',
+      'Kysely schema definition requires manual review.',
+    ])
   })
   test('rejects malformed TypeScript before producing partial lint evidence', async () => {
     await expect(migration('export async function up( {')).rejects.toThrow(

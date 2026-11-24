@@ -86,8 +86,32 @@ export async function readMigrationLintInputs(
           const valuePosition = /(?:=|<>|!=|<=|>=|<|>|\bVALUES\s*\(|,|\bIN\s*\()\s*$/i.test(
             sql.trimEnd(),
           )
-          if (!valuePosition) dynamic = true
-          sql += 'NULL' + span.literal.text
+          let expression = span.expression
+          while (ts.isParenthesizedExpression(expression)) expression = expression.expression
+          let fragment: string | undefined
+          if (
+            ts.isTaggedTemplateExpression(expression) &&
+            isSql(expression.tag) &&
+            ts.isNoSubstitutionTemplateLiteral(expression.template)
+          )
+            fragment = expression.template.text
+          else if (
+            ts.isCallExpression(expression) &&
+            ts.isPropertyAccessExpression(expression.expression) &&
+            expression.expression.name.text === 'raw' &&
+            isSql(expression.expression.expression)
+          )
+            fragment = staticString(ts, expression.arguments[0])
+          if (fragment !== undefined) sql += fragment + span.literal.text
+          else {
+            if (
+              !valuePosition ||
+              ts.isCallExpression(expression) ||
+              ts.isTaggedTemplateExpression(expression)
+            )
+              dynamic = true
+            sql += 'NULL' + span.literal.text
+          }
         }
         if (dynamic) gap(node, 'Dynamic SQL structure cannot be analyzed.')
         else queries.push({ sql, source: location(node), anchor: true })
@@ -130,6 +154,19 @@ export async function readMigrationLintInputs(
       gap(node, 'Migration call may contain database effects outside static analysis.')
     ts.forEachChild(node, visit)
   }
+  const inspectInitialization = (node: import('typescript-ast').Node): void => {
+    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return
+    if (
+      ts.isCallExpression(node) ||
+      ts.isNewExpression(node) ||
+      ts.isTaggedTemplateExpression(node) ||
+      ts.isAwaitExpression(node)
+    ) {
+      gap(node, 'Top-level migration initialization may execute before lint enforcement.')
+      return
+    }
+    ts.forEachChild(node, inspectInitialization)
+  }
   for (const statement of tree.statements) {
     if (
       !ts.isFunctionDeclaration(statement) &&
@@ -165,7 +202,7 @@ export async function readMigrationLintInputs(
             visit(declaration.initializer)
           } else
             gap(declaration.initializer, 'Migration handler implementation cannot be inspected.')
-        }
+        } else if (declaration.initializer) inspectInitialization(declaration.initializer)
       }
   }
   for (const statement of tree.statements) {

@@ -1,8 +1,8 @@
 {
   "zenlev-deployment-planning": {
-    "reason": "Reviewed locked plan validation and write veto ordering. Dry runs and plan-only output remain independent of write hooks. Reviewed updated source paths after grouping modules by responsibility.",
+    "reason": "Verified the final apply snapshot and validated veto ordering before migration writes.",
     "files": {
-      "src/migrate/execution.ts": "df74a7592173384d1a961ecb5dc4c60f7a9b0defde76c1022928d70d621ce8cb",
+      "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
       "src/migrate/graph.ts": "e9f7c68b19b3bd2f3cc365687467eb6b21b6fe2960b8aab4f4a1584ae5ec7be8",
       "website/content/docs/guides/_skills/zenlev-deployment-planning/SKILL.md": "267fabcf688e1399463879c2790bcd55e5ee66be1fff42a0fdb64b7966246729",
       "website/content/docs/guides/_skills/zenlev-deployment-planning/scripts/check-plan.ts": "c46c830788f69c8ab2f0fab2d385501ae7d29fc006a7b72db85a4a58ef4e7e4a",
@@ -12,37 +12,37 @@
     }
   },
   "zenlev-migration-authoring": {
-    "reason": "Reviewed offline lint, AST evidence, migration file integrity, and the apply guard before handler execution. Reviewed updated source paths after grouping modules by responsibility.",
+    "reason": "Verified static migration analysis, ZModel physical evidence, and snapshot identities during apply.",
     "files": {
       "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
-      "src/lint/project.ts": "f74bbd9755114932e7ad19a7e731907c77970658e9652d88c09138a77376caa8",
-      "src/lint/source/migration.ts": "7232956826a6445dbf0dd951c8dc7c24b05b92ec4cbd438f477ff591f1d06cc5",
-      "src/lint/zmodel.ts": "cbd197ba0234599f2f83af591b70b583bbb4cdc88e005c22b0281585d1370931",
-      "src/migrate/execution.ts": "df74a7592173384d1a961ecb5dc4c60f7a9b0defde76c1022928d70d621ce8cb",
+      "src/lint/project.ts": "a442054ac441684e36aed583cf646bee87ec8e70908b20f8a8d4fd43f581eef2",
+      "src/lint/source/migration.ts": "03fc5b5e5bf3fd8f98d5d0d95fa03216faf950967c3291eb094c8e59d2df19fa",
+      "src/lint/zmodel.ts": "7830287f86eec7153c5c85e22d69612adc29054103894eb90b482947c9ebc12f",
+      "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
       "src/migrate/files.ts": "02eb7ce82e97b2f81c322e375c90219dc894b63315636068da763afedfb1bfa3",
       "src/types.ts": "6d587e0c20c9bc05a8f5b60f06811e23fd4d5ea37ee6c8ea28a50d08215b7e18",
       "website/content/docs/guides/_skills/zenlev-migration-authoring/SKILL.md": "ff5377522b61026db4d31e452f775302536ae34316759c6029b369fdb660b0bd",
       "website/content/docs/guides/linting.mdx": "aeb5d0bbe3d8972261365c2c1af473049280491b4662d9fddbd010517bd22825",
       "website/content/docs/guides/migrations.mdx": "f28c99f690d20c725366ed73312b211d44c43fc05cb127b5bf114d36fbd85a53",
       "website/content/docs/reference/commands.mdx": "43f6fd2566ed74b41778c7774591aa1216e60926dadbe5ab77fb3acf66ad485b",
-      "website/content/docs/reference/lint-rules.mdx": "5cc8e8c829768bc00aabe20b86927a40b4bc86573495e1d9dbf8898eae3808c4"
+      "website/content/docs/reference/lint-rules.mdx": "8483c0953c1df78b90083a72777957f70e56c42a7f22a2082271035ee69339a4"
     }
   },
   "zenlev-plugin-authoring": {
-    "reason": "Reviewed write hook registration, read-only plan evidence, and the separation of lint rule plugins from migration hooks. Reviewed updated source paths after grouping modules by responsibility.",
+    "reason": "Verified catalog identity matching, write-plan snapshot fields, and updated lint-rule examples.",
     "files": {
       "src/engine.ts": "1ad09e9341a1053208bfa608dae83c3b9aaf74fa42c87bf70af3d51705b41bb8",
-      "src/lint/plugin.ts": "f36633198b18b8bc388124cc787d45fa12480094e906f3c4014cee848f2241aa",
-      "src/lint/runner.ts": "e50964f11f400f14c14a37fc1d7c0c41aa90ec907b370c1ea350ad5e411bb0f0",
-      "src/lint/types.ts": "92ba4eabf19fcbc7fdb8c6ab6f8c4542974d77139cb8e9bba081e67b6b4cd13b",
-      "src/migrate/execution.ts": "df74a7592173384d1a961ecb5dc4c60f7a9b0defde76c1022928d70d621ce8cb",
-      "src/plugins.ts": "b9b1edf85362d2eccaf5a90abdc09f9a8d3652e9972baa80518cb60de8ea805a",
+      "src/lint/plugin.ts": "1b10a800f85ab8d2b0d5083ec477616150d338df580741fe88ec6b7d26b138a0",
+      "src/lint/runner.ts": "ff593b5ff54a758b3756c2d67bb31f8a9063ad55d7a0801d5fab816a5f183449",
+      "src/lint/types.ts": "27f4343f81fb9cee7d64414013bc79c9c8a32ffe615fcbff088b834b5293110c",
+      "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
+      "src/plugins.ts": "1b20e976048e706635e7650a86357e9a69c910493d463d2e1ea2676fd4286778",
       "src/types.ts": "6d587e0c20c9bc05a8f5b60f06811e23fd4d5ea37ee6c8ea28a50d08215b7e18",
       "website/content/docs/guides/_skills/zenlev-plugin-authoring/SKILL.md": "81329fd863e59a9f055b7ee1d8ced1ad2a698f8007789d775fbb320a0f0dcfb5",
       "website/content/docs/guides/linting.mdx": "aeb5d0bbe3d8972261365c2c1af473049280491b4662d9fddbd010517bd22825",
       "website/content/docs/reference/api.mdx": "f32cb5c0613b8704be3e68ff25e50d91ea5cb3d68e3b6b059dd6dfe3bdffc385",
-      "website/content/docs/reference/lint-rules.mdx": "5cc8e8c829768bc00aabe20b86927a40b4bc86573495e1d9dbf8898eae3808c4",
-      "website/content/docs/reference/plugins-telemetry.mdx": "25c285f171b6458e910cbecb268a72aca0c5fd3aec67799e86f35525a2214a8c"
+      "website/content/docs/reference/lint-rules.mdx": "8483c0953c1df78b90083a72777957f70e56c42a7f22a2082271035ee69339a4",
+      "website/content/docs/reference/plugins-telemetry.mdx": "b77e0216a3728562d87212d26627bda0682035fd77918331f5a303e5d6864309"
     }
   },
   "zenlev-recovery": {
@@ -58,11 +58,11 @@
     }
   },
   "zenlev-schema-diff": {
-    "reason": "Reviewed shared ZModel loading and the write hook after the locked schema comparison and drop confirmation. Reviewed updated source paths after grouping modules by responsibility.",
+    "reason": "Verified discovered namespaces, physical defaults, and catalog blockers across the supported dialects.",
     "files": {
-      "src/schema/catalog.ts": "4f4f314bdf5e2715febca98b4a13dd4a069df2b0c1e035532a0f058a5da37a4e",
+      "src/schema/catalog.ts": "535e4f8e059c8ff6331578b5e76c3d9b7e75be0ee5e290de71ca19e6d83c95fa",
       "src/schema/commands.ts": "9587f2b199ba39684a7ae6c9dc2ad3d862bb744d0a5abd547b0e6d28b1823d98",
-      "src/schema/diff.ts": "be43303bce6a197e232c745c3cb39357b08ab07a4a1787428c6c0c7b803f6cf0",
+      "src/schema/diff.ts": "dacc98143c7355dba8dcbff45ab913862c74a4814c288a53c8136b626d3a4318",
       "src/schema/model.ts": "3687e3d3e5a80bde17365912c01ac8aadaa61046d25cb0d792e0405b0886141d",
       "website/content/docs/guides/_skills/zenlev-schema-diff/SKILL.md": "41a8ff5a77cedf37c7573fd3eb8119d0dd9013eafdeaa550cd9ab6fd942303e0",
       "website/content/docs/guides/schema-changes.mdx": "3bcf517c2acab1c524c883e2d92ed2192a01bae1e33bad37a603d462c323ced7",
@@ -70,9 +70,9 @@
     }
   },
   "zenlev-setup": {
-    "reason": "Reviewed lint configuration and CLI discovery, including offline config loading without connection setup. Reviewed updated source paths after grouping modules by responsibility.",
+    "reason": "Verified offline configuration and custom live catalog connection selection.",
     "files": {
-      "src/config.ts": "ee8e69b6dad490e0b09e720379624007747c9a4baa24b4f620078dba0a3bbf20",
+      "src/config.ts": "ace9e91be8b22977f072502fad834ec66234f2b1aecd64db3931b20a6e984d09",
       "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
       "src/types.ts": "6d587e0c20c9bc05a8f5b60f06811e23fd4d5ea37ee6c8ea28a50d08215b7e18",
       "website/content/docs/guides/_skills/zenlev-setup/SKILL.md": "bf68d72e2ec10fac6dea532f0e66399826441aba7f76da2e1fc2213061fac8f3",

@@ -39,16 +39,24 @@ export function statement(query: CompiledQuery): SqlStatement {
   return { sql: query.sql, parameters: query.parameters }
 }
 
-export function defaultValue(value: ColumnDefault): RawBuilder<unknown> {
+export function defaultValue(value: ColumnDefault, dialect: Dialect): RawBuilder<unknown> {
   if (value.kind === 'literal') return sql.lit(value.value)
-  if (
-    !/^(CURRENT_TIMESTAMP(?:\(\d+\))?|CURRENT_DATE|CURRENT_TIME|now\(\)|gen_random_uuid\(\)|uuid\(\)|uuid_generate_v4\(\))$/i.test(
-      value.sql.trim(),
-    )
-  ) {
+  const expression = value.sql.trim()
+  const supported =
+    /^(CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME)$/i.test(expression) ||
+    (dialect === 'postgresql' &&
+      /^(CURRENT_TIMESTAMP\(\d+\)|now\(\)|gen_random_uuid\(\)|uuid_generate_v4\(\))$/i.test(
+        expression,
+      )) ||
+    (dialect === 'mysql' && /^(CURRENT_TIMESTAMP\(\d+\)|now\(\)|uuid\(\))$/i.test(expression))
+  if (!supported) {
     throw new Error('Unsupported default expression requires a manual migration')
   }
-  return sql.raw(value.sql)
+  return sql.raw(
+    dialect === 'mysql' && /^(CURRENT_DATE|CURRENT_TIME|uuid\(\))$/i.test(expression)
+      ? '(' + expression + ')'
+      : expression,
+  )
 }
 
 export function renderType(
@@ -82,7 +90,10 @@ export function renderColumn(column: SchemaColumn, inlinePrimary: boolean, diale
     if (column.autoIncrement)
       next = dialect === 'postgresql' ? next.generatedByDefaultAsIdentity() : next.autoIncrement()
     if (!column.nullable) next = next.notNull()
-    if (column.default) next = next.defaultTo(defaultValue(comparableDefault(column, dialect)!))
+    if (column.default)
+      next = next.defaultTo(
+        defaultValue(comparableDefault(column, dialect) ?? column.default, dialect),
+      )
     return next
   }
 }

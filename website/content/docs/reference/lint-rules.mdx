@@ -47,6 +47,8 @@ Naming templates accept `{name}`, `{schema}`, `{table}`, `{tableStem}`, `{column
 
 The `objects/restricted` rule permits `drop` and `call` by default. Configure `actions` to target operations explicitly. PostgreSQL routine identities include argument signatures when resolved.
 
+`trustedSearchPath` applies to PostgreSQL functions and procedures. A missing execution mode or search path produces a coverage gap where applicable. Use `objects/restricted` to govern materialized views.
+
 ## Example company conventions
 
 This example selects plural physical tables, explicit relation entities, UUID primary keys, ordered constraint names, audit columns, and reverse foreign key indexes.
@@ -191,7 +193,8 @@ export const requireTimestampHelper: LintRule = {
             candidate.action === 'call' &&
             candidate.identity === 'public.diesel_manage_updated_at' &&
             candidate.source?.path === source.path &&
-            candidate.source.line > source.line,
+            (candidate.source.line > source.line ||
+              (candidate.source.line === source.line && candidate.source.column > source.column)),
         )
         if (!registered) context.report({ node, messageId: 'missing', data: { table: node.name } })
       },

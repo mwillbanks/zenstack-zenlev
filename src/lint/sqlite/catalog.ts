@@ -48,6 +48,8 @@ export async function sqlite(
             column: 1,
           })
         : { nodes: [], gaps: [] }
+      const checksKnown = entry.definition !== null && parsed.gaps.length === 0
+      nodes[nodes.length - 1] = { ...nodes[nodes.length - 1]!, checksKnown }
       const fields = await rows(
         db,
         sql<{
@@ -78,7 +80,7 @@ export async function sqlite(
         nodes.push({
           ...node('sqlite', 'column', field.name, schema, entry.name),
           type: field.type,
-          nullable: field.nullable === 0 && field.pk === 0,
+          nullable: field.nullable === 0 && !(rowid && field.pk === 1),
           sequential: rowid && field.pk === 1,
           generated: field.hidden !== 0,
           ...(field.default_value === null ? {} : { default: field.default_value }),
@@ -90,8 +92,10 @@ export async function sqlite(
         nodes.push({
           ...node('sqlite', 'primary-key', declared?.name ?? 'PRIMARY', schema, entry.name),
           columns: pk.map((field) => field.name),
-          generated: declared === undefined,
-          explicit: declared !== undefined,
+          nameKnown: checksKnown,
+          ...(checksKnown
+            ? { generated: declared === undefined, explicit: declared !== undefined }
+            : {}),
         })
       }
       for (const index of indexes) {
@@ -134,8 +138,10 @@ export async function sqlite(
           ...(parts.some((part) => part.to_column === null)
             ? {}
             : { targetColumns: parts.map((part) => part.to_column!) }),
-          generated: declared === undefined,
-          explicit: declared !== undefined,
+          nameKnown: checksKnown,
+          ...(checksKnown
+            ? { generated: declared === undefined, explicit: declared !== undefined }
+            : {}),
         })
       }
       for (const constraint of parsed.nodes.filter(

@@ -256,7 +256,11 @@ test('protects enum conversions and retained enum dependencies', () => {
   const definition = { name: 'State', namespace: 'app', values: ['a'] }
   const old = model(
     'postgresql',
-    [table('retained', { columns: [column('state', { enumName: 'app.State', type: 'State' })] })],
+    [
+      table('retained', {
+        columns: [column('state', { enumName: 'State', enumNamespace: 'app', type: 'State' })],
+      }),
+    ],
     { enums: [definition] },
   )
   const changed = diff(
@@ -292,6 +296,92 @@ test.each([
     diff(model(), model('sqlite', [table('items', { columns: [bad], primaryKey: [] })])).blockers[0]
       ?.code,
   ).toBe('UNSUPPORTED_DDL')
+})
+
+test.each(['varchar(80)', 'character varying(80)'])(
+  'normalizes PostgreSQL varchar spelling %s',
+  (type) => {
+    const before = model('postgresql', [table('items', { columns: [column('id', { type })] })])
+    const after = model('postgresql', [
+      table('items', { columns: [column('id', { type: 'varchar(80)' })] }),
+    ])
+    expect(diff(before, after).operations).toEqual([])
+  },
+)
+
+test('normalizes implicit and explicit MySQL nullable NULL defaults', () => {
+  const implicit = model('mysql', [table('items', { columns: [column('id', { nullable: true })] })])
+  const explicit = model('mysql', [
+    table('items', {
+      columns: [column('id', { nullable: true, default: { kind: 'literal', value: null } })],
+    }),
+  ])
+  expect(diff(implicit, explicit).operations).toEqual([])
+  expect(diff(explicit, implicit).operations).toEqual([])
+})
+
+test('keeps qualified enum identities distinct when identifiers contain dots or quotes', () => {
+  const definitions = [
+    { namespace: 'app', name: 'foo.bar', values: ['first'] },
+    { namespace: 'app.foo', name: 'bar', values: ['second'] },
+    { name: 'literal"quote', values: ['third'] },
+  ]
+  const target = model(
+    'postgresql',
+    [
+      table('first', {
+        columns: [column('id', { type: 'foo.bar', enumName: 'foo.bar', enumNamespace: 'app' })],
+      }),
+      table('second', {
+        columns: [column('id', { type: 'bar', enumName: 'bar', enumNamespace: 'app.foo' })],
+      }),
+      table('third', {
+        columns: [column('id', { type: 'literal"quote', enumName: 'literal"quote' })],
+      }),
+    ],
+    { namespaces: ['app', 'app.foo'], enums: definitions },
+  )
+  const changes = diff(model('postgresql'), target)
+  expect(changes.blockers).toEqual([])
+  expect(changes.operations.filter(({ kind }) => kind === 'create-enum')).toHaveLength(3)
+  expect(sqlOf(changes)).toContain('"id" "app"."foo.bar"')
+  expect(sqlOf(changes)).toContain('"id" "app.foo"."bar"')
+  expect(sqlOf(changes)).toContain('"id" "literal""quote"')
+  expect(diff(target, target).operations).toEqual([])
+})
+
+test.each([
+  ['sqlite', 'now()', false],
+  ['sqlite', 'uuid()', false],
+  ['sqlite', 'gen_random_uuid()', false],
+  ['sqlite', 'CURRENT_TIMESTAMP(3)', false],
+  ['sqlite', 'CURRENT_TIMESTAMP', true],
+  ['sqlite', 'CURRENT_DATE', true],
+  ['sqlite', 'CURRENT_TIME', true],
+  ['postgresql', 'now()', true],
+  ['postgresql', 'gen_random_uuid()', true],
+  ['postgresql', 'uuid_generate_v4()', true],
+  ['postgresql', 'CURRENT_TIMESTAMP(3)', true],
+  ['postgresql', 'uuid()', false],
+  ['mysql', 'uuid()', true],
+  ['mysql', 'now()', true],
+  ['mysql', 'CURRENT_TIMESTAMP(3)', true],
+  ['mysql', 'CURRENT_DATE', true],
+  ['mysql', 'CURRENT_TIME', true],
+  ['mysql', 'gen_random_uuid()', false],
+  ['mysql', 'uuid_generate_v4()', false],
+] as const)('checks %s default expression %s before execution', (dialect, expression, accepted) => {
+  const changes = diff(
+    model(dialect),
+    model(dialect, [
+      table('items', {
+        columns: [column('id', { type: 'text', default: { kind: 'sql', sql: expression } })],
+      }),
+    ]),
+  )
+  expect(changes.blockers.map(({ code }) => code)).toEqual(accepted ? [] : ['UNSUPPORTED_DDL'])
+  if (accepted && dialect === 'mysql' && /^(uuid\(\)|CURRENT_DATE|CURRENT_TIME)$/.test(expression))
+    expect(sqlOf(changes)).toContain('default (' + expression + ')')
 })
 
 test('adds nullable and literal-default SQLite columns with reversible SQL', () => {

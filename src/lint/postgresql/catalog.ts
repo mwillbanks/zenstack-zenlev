@@ -10,7 +10,7 @@ export async function postgres(
     db,
     sql<{ name: string }>`
     SELECT nspname AS name FROM pg_catalog.pg_namespace
-    WHERE nspname NOT LIKE 'pg_%' AND nspname <> 'information_schema' ORDER BY nspname
+    WHERE nspname !~ '^pg_' AND nspname <> 'information_schema' ORDER BY nspname
   `,
   )
   const selected = schemas

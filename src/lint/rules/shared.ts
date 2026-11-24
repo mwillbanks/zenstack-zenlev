@@ -1,3 +1,4 @@
+import { identity } from '../../identity'
 import type { LintNode, LintRule, LintRuleContext } from '../types'
 
 export type Options = Record<string, unknown>
@@ -34,12 +35,12 @@ export function matches(value: string, pattern: string): boolean {
 }
 
 export function qualified(node: LintNode): string {
-  return [node.schema, node.table, node.name].filter(Boolean).join('.')
+  return identity(node.schema, ...(node.table === undefined ? [] : [node.table]), node.name)
 }
 
 export function tableIdentity(node: LintNode): string {
   const table = node.kind === 'table' || node.kind === 'view' ? node.name : node.table
-  return [node.schema, table].filter(Boolean).join('.')
+  return table === undefined ? '' : identity(node.schema, table)
 }
 
 export function selected(node: LintNode, config: Options): boolean {
@@ -68,11 +69,13 @@ function activeNodes(context: LintRuleContext): readonly LintNode[] {
       }
       continue
     }
-    const key = [
+    const key = JSON.stringify([
       node.kind,
-      node.identity ??
-        [node.schema, node.table, node.name || node.columns?.join(','), node.signature].join(':'),
-    ].join(':')
+      node.identity ?? [node.schema, node.table, node.name, node.signature],
+      !node.identity && !node.name
+        ? [node.columns, node.targetTable, node.targetColumns, node.source]
+        : undefined,
+    ])
     if (node.action === 'drop') active.delete(key)
     else {
       const previous = active.get(key)
@@ -193,5 +196,18 @@ export function configuredRule(
 }
 
 export function isTrue(expression: string | null | undefined): boolean {
-  return typeof expression === 'string' && /^\(*\s*true\s*\)*$/i.test(expression.trim())
+  if (typeof expression !== 'string') return false
+  const bool = String.raw`(?:pg_catalog\s*\.\s*)?(?:bool|boolean)`
+  const suffix = new RegExp(String.raw`\s*::\s*${bool}$`, 'i')
+  const cast = new RegExp(String.raw`^cast\s*\((.+)\s+as\s+${bool}\s*\)$`, 'is')
+  let value = expression.trim()
+  for (;;) {
+    if (/^true$/i.test(value)) return true
+    const stripped =
+      value.startsWith('(') && value.endsWith(')')
+        ? value.slice(1, -1)
+        : (cast.exec(value)?.[1] ?? value.replace(suffix, ''))
+    if (stripped === value) return false
+    value = stripped.trim()
+  }
 }

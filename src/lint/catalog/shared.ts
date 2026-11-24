@@ -1,4 +1,5 @@
 import type { Kysely, RawBuilder } from 'kysely'
+import { identity } from '../../identity'
 import type { LintNode } from '../types'
 
 export const columnCapabilities = [
@@ -19,9 +20,7 @@ export async function rows<T>(db: Kysely<any>, query: RawBuilder<T>): Promise<T[
   return (await query.execute(db)).rows
 }
 
-export function identity(schema: string | undefined, ...names: string[]): string {
-  return [...(schema ? [schema] : []), ...names].join('.')
-}
+export { identity } from '../../identity'
 
 export function grouped<T>(values: readonly T[], key: (value: T) => string): T[][] {
   const groups = new Map<string, T[]>()

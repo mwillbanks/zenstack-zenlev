@@ -33,6 +33,11 @@ export async function sqliteTable(
     .filter(({ pk }) => pk > 0)
     .sort((a, b) => a.pk - b.pk)
     .map(({ name }) => name)
+  // PRAGMA omits clause syntax. Ignore literals, quoted identifiers, and comments before checking keywords.
+  const definition = (table.definition ?? '').replace(
+    /'(?:''|[^'])*'|"(?:""|[^"])*"|`(?:``|[^`])*`|\[[^\]]*\]|--[^\r\n]*|\/\*[\s\S]*?\*\//g,
+    ' ',
+  )
   const columns = fields
     .filter(({ hidden }) => hidden === 0)
     .map((field) =>
@@ -40,16 +45,15 @@ export async function sqliteTable(
         field.name,
         field.type || 'blob',
         field.notnull === 0 && field.pk === 0,
-        field.pk > 0 && /\bAUTOINCREMENT\b/i.test(table.definition ?? ''),
+        field.pk > 0 && /\bAUTOINCREMENT\b/i.test(definition),
         literalDefault(field.dflt_value),
       ),
     )
   if (fields.some(({ hidden }) => hidden !== 0))
     unsupported.push(diagnostic(table, 'has hidden or generated columns'))
   if (
-    /\b(?:CHECK\s*\(|COLLATE\s+|WITHOUT ROWID|CREATE\s+VIRTUAL\s+TABLE)\b/i.test(
-      table.definition ?? '',
-    )
+    /\b(?:CHECK\s*\(|COLLATE\s+|WITHOUT\s+ROWID\b|CREATE\s+VIRTUAL\s+TABLE\b)/i.test(definition) ||
+    /\bDEFERRABLE\b/i.test(definition.replace(/\bNOT\s+DEFERRABLE\b/gi, ' '))
   ) {
     unsupported.push(
       diagnostic(table, 'has SQLite constraints or storage features outside the diff model'),

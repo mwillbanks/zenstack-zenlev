@@ -57,3 +57,24 @@ test('stored-object security checks invoker mode and explicit trusted definer pa
   ).toHaveLength(0)
   expect(inspect('objects/security', [routine], { publicExecute: false }).gaps).toHaveLength(1)
 })
+
+test('trusted search path checks only PostgreSQL routines and reports unavailable security once', () => {
+  const options = { trustedSearchPath: ['pg_catalog'] }
+  const routine = node('function', 'calculate')
+  expect(inspect('objects/security', [routine], options).gaps).toHaveLength(1)
+  expect(
+    inspect('objects/security', [routine], { ...options, security: 'invoker' }).gaps,
+  ).toHaveLength(1)
+  const view = node('view', 'accounts', { security: 'definer' })
+  const mysql = { ...routine, dialect: 'mysql', security: 'definer' }
+  expect(inspect('objects/security', [view, mysql], options).gaps).toHaveLength(0)
+  const materialized = { ...view, kind: 'materialized-view' }
+  expect(inspect('objects/security', [materialized], { security: 'invoker' }).reports).toHaveLength(
+    0,
+  )
+  expect(
+    inspect('objects/security', [{ ...materialized, origin: 'catalog', security: undefined }], {
+      security: 'invoker',
+    }).gaps,
+  ).toHaveLength(0)
+})

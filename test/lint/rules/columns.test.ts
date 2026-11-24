@@ -45,3 +45,13 @@ test('column conventions use explicit types and selectors for business semantics
     }).reports,
   ).toHaveLength(3)
 })
+
+test('column conventions report evidence gaps for unknown type and nullability', () => {
+  const partial = { ...id, origin: 'catalog' as const, type: undefined, nullable: undefined }
+  const required = inspect('columns/required', [table, partial], {
+    columns: { id: { type: 'uuid', nullable: false } },
+  })
+  expect(required.reports).toHaveLength(0)
+  expect(required.gaps).toHaveLength(2)
+  expect(inspect('columns/conventions', [partial], { allowedTypes: ['uuid'] }).gaps).toHaveLength(1)
+})

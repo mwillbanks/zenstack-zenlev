@@ -37,9 +37,20 @@ export async function mysqlTable(
     const value =
       field.default_value === null
         ? undefined
-        : ['char', 'varchar', 'text', 'tinytext', 'mediumtext', 'longtext', 'enum', 'set'].includes(
-              field.data_type,
-            ) && !field.extra.includes('DEFAULT_GENERATED')
+        : [
+              'char',
+              'varchar',
+              'text',
+              'tinytext',
+              'mediumtext',
+              'longtext',
+              'enum',
+              'set',
+              'date',
+              'datetime',
+              'timestamp',
+              'time',
+            ].includes(field.data_type) && !field.extra.includes('DEFAULT_GENERATED')
           ? { kind: 'literal' as const, value: field.default_value }
           : literalDefault(field.default_value)
     return column(

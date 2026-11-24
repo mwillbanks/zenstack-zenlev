@@ -54,21 +54,25 @@ const objectSecurity = defineRule(
   (context, config) => ({
     '*': (node) => {
       if (
-        !['function', 'procedure', 'view', 'materialized-view', 'trigger', 'event'].includes(
-          node.kind,
-        ) ||
+        !['function', 'procedure', 'view', 'trigger', 'event'].includes(node.kind) ||
         !selected(node, config) ||
         node.action === 'drop' ||
         node.action === 'call'
       )
         return
-      if (config.security !== undefined) {
-        if (node.security === undefined)
-          context.gap('Stored-object execution security is unavailable.', node)
-        else if (node.security.toLowerCase() !== text(config.security).toLowerCase())
-          report(context, node, 'Use ' + text(config.security) + ' execution security.')
-      }
-      if (config.trustedSearchPath !== undefined && node.security?.toLowerCase() === 'definer') {
+      const routine = node.kind === 'function' || node.kind === 'procedure'
+      const trustedPath =
+        routine && node.dialect === 'postgresql' && config.trustedSearchPath !== undefined
+      const security = node.security?.toLowerCase()
+      if ((config.security !== undefined || trustedPath) && security === undefined)
+        context.gap('Stored-object execution security is unavailable.', node)
+      if (
+        config.security !== undefined &&
+        security !== undefined &&
+        security !== text(config.security)
+      )
+        report(context, node, 'Use ' + text(config.security) + ' execution security.')
+      if (trustedPath && security === 'definer') {
         const trusted = strings(config.trustedSearchPath)
         if (!node.searchPath) context.gap('Definer search_path is unavailable.', node)
         else if (
@@ -77,7 +81,7 @@ const objectSecurity = defineRule(
         )
           report(context, node, 'Set an explicit trusted search_path for the definer routine.')
       }
-      if (config.publicExecute === false && ['function', 'procedure'].includes(node.kind))
+      if (config.publicExecute === false && routine)
         context.gap('PUBLIC EXECUTE auditing requires grant and role metadata.', node)
     },
   }),

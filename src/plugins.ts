@@ -46,7 +46,7 @@ export interface WriteDiagnostic {
 }
 
 export interface PlannedMigrationHandler {
-  readonly migration: MigrationIdentity
+  readonly migration: Omit<MigrationIdentity, 'custom'>
   readonly direction: 'up' | 'down'
 }
 

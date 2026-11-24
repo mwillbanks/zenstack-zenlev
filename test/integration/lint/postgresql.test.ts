@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { Kysely, PostgresDialect, sql } from 'kysely'
 import { Pool } from 'pg'
-import { createKyselyAdapter, lintProject } from '../../../src'
+import { createKyselyAdapter, createZenlev, lintPlugin, lintProject } from '../../../src'
 import { readBuiltinLintCatalog } from '../../../src/lint/catalog'
 
 const postgresUrl = process.env.ZENLEV_TEST_POSTGRES_URL
@@ -12,7 +14,7 @@ describe.skipIf(postgresUrl === undefined)('PostgreSQL lint catalog', () => {
     })
     const adapter = createKyselyAdapter(db, 'postgresql')
     const schema = 'zenlev_lint_catalog'
-    const shadow = 'zenlev_lint_shadow'
+    const shadow = 'pgapp'
     try {
       await sql.raw('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE').execute(db)
       await sql.raw('DROP SCHEMA IF EXISTS ' + shadow + ' CASCADE').execute(db)
@@ -298,6 +300,53 @@ describe.skipIf(postgresUrl === undefined)('PostgreSQL lint catalog', () => {
       } finally {
         await db.destroy()
       }
+    }
+  })
+
+  test('push checks ZModel declarations in schemas containing dots', async () => {
+    const cwd = await mkdtemp(join(import.meta.dir, '.zenlev-lint-push-'))
+    const namespace = 'zenlev_lint.push'
+    const db = new Kysely<any>({
+      dialect: new PostgresDialect({ pool: new Pool({ connectionString: postgresUrl!, max: 1 }) }),
+    })
+    try {
+      await Bun.write(
+        join(cwd, 'schema.zmodel'),
+        `
+        datasource db {
+          provider = "postgresql"
+          schemas = ["${namespace}"]
+        }
+        model badModel {
+          id String @id
+          @@map("items")
+          @@schema("${namespace}")
+        }
+      `,
+      )
+      const zenlev = await createZenlev({
+        cwd,
+        adapter: createKyselyAdapter(db, 'postgresql'),
+        plugins: [lintPlugin()],
+      })
+      try {
+        const result = await zenlev.db.push()
+        expect(result.status).toBe('blocked')
+        expect(result.diagnostics).toContainEqual(
+          expect.objectContaining({
+            ruleId: 'zenlev/naming/model-case',
+            identity: '"zenlev_lint.push".badModel',
+          }),
+        )
+        const { rows } =
+          await sql`SELECT nspname FROM pg_namespace WHERE nspname = ${namespace}`.execute(db)
+        expect(rows).toEqual([])
+      } finally {
+        await zenlev.close()
+      }
+    } finally {
+      await db.destroy()
+      await rm(cwd, { recursive: true, force: true })
     }
   })
 })

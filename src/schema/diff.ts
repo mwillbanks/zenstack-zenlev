@@ -529,7 +529,7 @@ export function buildChangeSet(
                   .alterTable(table.name)
                   .alterColumn(column.name, (alter) =>
                     column.default
-                      ? alter.setDefault(defaultValue(column.default))
+                      ? alter.setDefault(defaultValue(column.default, dialect))
                       : alter.dropDefault(),
                   ),
               ),

@@ -1,4 +1,5 @@
 import type { LintGap, LintNode } from '../types'
+import { identity } from '../../identity'
 import {
   columnList,
   groups,
@@ -6,6 +7,8 @@ import {
   keyword,
   position,
   words,
+  topLevel,
+  typeName,
   type Token,
   type EmitNode,
 } from './tokens'
@@ -20,8 +23,8 @@ export function tableDefinitions(
   make: EmitNode,
 ) {
   function extractTable() {
-    const opening = tokens.findIndex((token, index) => index >= item.end && token.value === '(')
-    if (opening < 0) {
+    const opening = keyword(tokens[item.end], '(') ? item.end : -1
+    if (opening < 0 || position(topLevel(tokens), 'AS') >= 0) {
       gaps.push({
         message: 'CREATE TABLE AS or inherited columns require catalog inspection.',
         source: node.source,
@@ -31,12 +34,32 @@ export function tableDefinitions(
     }
     const definitions = groups(tokens, opening)
     for (const definition of definitions) extractDefinition(definition)
-    const pk = nodes.find((candidate) => candidate.kind === 'primary-key')
-    if (
-      dialect === 'sqlite' &&
-      pk?.columns?.length === 1 &&
-      !/\bWITHOUT\s+ROWID\b/i.test(words(tokens))
-    ) {
+    if (position(tokens, 'INHERITS') >= 0)
+      gaps.push({
+        message: 'Inherited columns require catalog inspection.',
+        source: node.source,
+        identity: node.identity,
+      })
+    const pk = nodes.find(
+      (candidate) =>
+        candidate.kind === 'primary-key' &&
+        candidate.table === item.name &&
+        candidate.schema === item.schema,
+    )
+    const tableSurface = topLevel(tokens)
+    const without = position(tableSurface, 'WITHOUT')
+    const withoutRowid = without >= 0 && keyword(tableSurface[without + 1], 'ROWID')
+    const strictKey = dialect !== 'sqlite' || withoutRowid || position(tableSurface, 'STRICT') >= 0
+    for (const column of nodes)
+      if (
+        column.kind === 'column' &&
+        column.table === item.name &&
+        column.schema === item.schema &&
+        pk?.columns?.includes(column.name) &&
+        strictKey
+      )
+        Object.assign(column, { nullable: false })
+    if (dialect === 'sqlite' && pk?.columns?.length === 1 && !withoutRowid) {
       const column = nodes.find(
         (candidate) => candidate.kind === 'column' && candidate.name === pk.columns![0],
       )
@@ -45,7 +68,7 @@ export function tableDefinitions(
         column?.type?.toLowerCase() === 'integer' &&
         !/\bPRIMARY\s+KEY\s+DESC\b/i.test(words(definition ?? []))
       )
-        Object.assign(column, { sequential: true })
+        Object.assign(column, { sequential: true, nullable: false })
     }
   }
 
@@ -63,6 +86,7 @@ export function tableDefinitions(
       ['FOREIGN', 'foreign-key'],
       ['UNIQUE', 'unique'],
       ['CHECK', 'check'],
+      ['EXCLUDE', 'exclusion'],
     ]).get(first.value.toUpperCase())
     if (constraintKind && !first.quoted) {
       const name = constraint?.value ?? ''
@@ -74,7 +98,19 @@ export function tableDefinitions(
           schema: item.schema,
           columns: columnList(definition, current),
           generated: constraint === undefined,
-          identity: [item.schema, item.name, name || constraintKind].filter(Boolean).join('.'),
+          explicit: constraint !== undefined,
+          identity: identity(
+            item.schema,
+            item.name,
+            name ||
+              [
+                constraintKind,
+                node.source?.path,
+                node.source?.line,
+                node.source?.column,
+                first.start,
+              ].join(':'),
+          ),
         },
       )
       const ref = position(definition, 'REFERENCES')
@@ -90,9 +126,11 @@ export function tableDefinitions(
     }
     const column = identifier(definition, current)
     if (!column) return
+    const surface = topLevel(definition)
     const boundary = definition.findIndex(
       (token, index) =>
         index > current &&
+        surface.includes(token) &&
         [
           'PRIMARY',
           'NOT',
@@ -107,11 +145,13 @@ export function tableDefinitions(
           'AUTO_INCREMENT',
         ].some((word) => keyword(token, word)),
     )
-    const type = words(definition.slice(current + 1, boundary < 0 ? undefined : boundary))
-    const defaultIndex = position(definition, 'DEFAULT')
+    const type = typeName(definition.slice(current + 1, boundary < 0 ? undefined : boundary))
+    const defaultToken = surface.find((token) => keyword(token, 'DEFAULT'))
+    const defaultIndex = defaultToken ? definition.indexOf(defaultToken) : -1
     const defaultEnd = definition.findIndex(
       (token, index) =>
         index > defaultIndex &&
+        surface.includes(token) &&
         ['NOT', 'PRIMARY', 'REFERENCES', 'UNIQUE', 'CHECK', 'CONSTRAINT'].some((word) =>
           keyword(token, word),
         ),
@@ -120,8 +160,11 @@ export function tableDefinitions(
       table: item.name,
       schema: item.schema,
       type,
-      identity: [item.schema, item.name, column.name].filter(Boolean).join('.'),
-      nullable: !/\bNOT\s+NULL\b|\bPRIMARY\s+KEY\b/i.test(words(definition)),
+      identity: identity(item.schema, item.name, column.name),
+      nullable:
+        !surface.some(
+          (token, index) => keyword(token, 'NOT') && keyword(surface[index + 1], 'NULL'),
+        ) && !(dialect !== 'sqlite' && position(surface, 'PRIMARY') >= 0),
       sequential:
         ((dialect === 'postgresql' || dialect === 'mysql') &&
           /^(?:smallserial|serial|bigserial|serial2|serial4|serial8)$/i.test(type)) ||
@@ -139,6 +182,7 @@ export function tableDefinitions(
           return (
             defaultIndex >= 0 &&
             offset + current + 1 > defaultIndex &&
+            (defaultEnd < 0 || offset + current + 1 < defaultEnd) &&
             token.value === 'nextval' &&
             rest[offset + 1]?.value === '(' &&
             (rest[offset - 1]?.value !== '.' || rest[offset - 2]?.value === 'pg_catalog')
@@ -154,7 +198,7 @@ export function tableDefinitions(
     })
     const addInline = (kind: string, operation: string, extra: Partial<LintNode> = {}) => {
       for (const [index, token] of definition.entries()) {
-        if (!keyword(token, operation)) continue
+        if (!surface.includes(token) || !keyword(token, operation)) continue
         const named = keyword(definition[index - 2], 'CONSTRAINT')
           ? definition[index - 1]
           : undefined
@@ -167,9 +211,20 @@ export function tableDefinitions(
             schema: item.schema,
             columns: [column.name],
             generated: named === undefined,
-            identity: [item.schema, item.name, name || kind + ':' + column.name + ':' + index]
-              .filter(Boolean)
-              .join('.'),
+            explicit: named !== undefined,
+            identity: identity(
+              item.schema,
+              item.name,
+              name ||
+                [
+                  kind,
+                  column.name,
+                  node.source?.path,
+                  node.source?.line,
+                  node.source?.column,
+                  token.start,
+                ].join(':'),
+            ),
             ...extra,
           },
         )

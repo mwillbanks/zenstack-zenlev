@@ -26,6 +26,70 @@ function write(path: string, content: string | object) {
 
 const datasource = 'datasource db { provider = "sqlite" }\n'
 
+for (const dialect of ['sqlite', 'mysql', 'postgresql'] as const) {
+  test('normalizes physical ZModel evidence for ' + dialect, async () => {
+    await write(
+      'schema.zmodel',
+      `
+      datasource db { provider = "${dialect}" }
+      enum Status { ACTIVE @map("active") @@map("status_values") }
+      model Item {
+        id String @id(map: "item_pk") @default(uuid())
+        status Status @default(ACTIVE)
+        createdAt DateTime @default(now()) @map("created_at")
+        label String @unique
+        @@index([status])
+        @@map("items")
+      }
+    `,
+    )
+    const input = await readZModelLintInput({ cwd })
+    const column = (name: string) =>
+      input.nodes.find((node) => node.kind === 'column' && node.name === name)!
+    expect(column('id').default).toBeUndefined()
+    expect(column('created_at').default).toBe('CURRENT_TIMESTAMP')
+    expect(column('status').default).toBe("'active'")
+    expect(column('status').type).toBe(
+      dialect === 'sqlite' ? 'text' : dialect === 'mysql' ? "enum('active')" : 'status_values',
+    )
+    expect(input.nodes).toContainEqual(
+      expect.objectContaining({ kind: 'primary-key', name: 'item_pk', explicit: true }),
+    )
+    expect(input.nodes).toContainEqual(
+      expect.objectContaining({
+        kind: 'enum-value',
+        name: 'active',
+        table: 'status_values',
+        ...(dialect === 'postgresql' ? { schema: 'public' } : {}),
+      }),
+    )
+    expect(
+      input.nodes
+        .filter((node) => node.kind === 'unique' || node.kind === 'index')
+        .every((node) => node.nameKnown === false),
+    ).toBe(true)
+  })
+}
+
+test('escapes mapped table components in ZenStack policy identities', async () => {
+  await write(
+    'schema.zmodel',
+    datasource +
+      `
+plugin policy { provider = "@zenstackhq/plugin-policy" }
+model Item {
+  id String @id
+  @@allow('read', true)
+  @@map("billing.items")
+}
+`,
+  )
+  const input = await readZModelLintInput({ cwd })
+  expect(input.nodes.find((node) => node.kind === 'zenstack-policy')?.identity).toMatch(
+    /^"billing\.items"\.@@allow#\d+$/,
+  )
+})
+
 test('loads ZenStack AST and reports model, mapped column, and PK problems with source ranges', async () => {
   await write(
     'schema.zmodel',

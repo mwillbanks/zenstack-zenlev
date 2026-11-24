@@ -62,6 +62,7 @@ export async function lintProject(
   lintOptions(options)
   const project = await loadProjectConfig(config, configPath, {
     loadClientModule: options.live === true,
+    lintCatalogConnection: true,
   })
   const lint = project.lint ?? {}
   const run = await createLintRunner(lint, project.cwd, project.lintPluginBase)

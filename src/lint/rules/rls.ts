@@ -64,7 +64,6 @@ const rls = defineRule('Check configured PostgreSQL native row security.', (cont
       if (evaluated.has(key)) return
       const state = states.get(key)
       if (!state) return
-      evaluated.add(key)
       const anchor = node
       const tables = strings(config.tables)
       if (
@@ -72,6 +71,7 @@ const rls = defineRule('Check configured PostgreSQL native row security.', (cont
         (tables.length && !tables.some((pattern) => matches(tableIdentity(anchor), pattern)))
       )
         return
+      evaluated.add(key)
       if (config.enabled !== false) {
         if (state.enabled === undefined) context.gap('RLS enabled state is unavailable.', anchor)
         else if (!state.enabled)
@@ -117,7 +117,8 @@ const rls = defineRule('Check configured PostgreSQL native row security.', (cont
         policies.some(
           (policy) =>
             policy.action === 'alter' &&
-            (policy.command === undefined ||
+            (policy.permissive === undefined ||
+              policy.command === undefined ||
               policy.roles === undefined ||
               policy.using === undefined ||
               policy.check === undefined),

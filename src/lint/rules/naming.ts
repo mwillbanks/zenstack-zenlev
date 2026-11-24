@@ -37,7 +37,8 @@ function caseRule(kind: string, fallback: Format): LintRule {
     [kind](node) {
       if (!selected(node, config) || node.action === 'drop' || node.action === 'call') return
       const format = text(config.format, fallback)
-      if (!hasFormat(node.name, format)) {
+      const name = node.quoted ? node.name : (node.spelling ?? node.name)
+      if (!hasFormat(name, format)) {
         report(context, node, 'Use ' + format + ' for ' + kind + ' ' + node.name + '.')
       }
     },
@@ -51,12 +52,14 @@ const identifier = defineRule('Configure physical identifier conventions.', (con
   return {
     '*': (node) => {
       if (
-        ['model', 'field', 'rls', 'zenstack-policy'].includes(node.kind) ||
+        ['model', 'field', 'rls', 'zenstack-policy', 'anonymous-block'].includes(node.kind) ||
+        !node.name ||
+        node.nameKnown === false ||
         !selected(node, config)
       )
         return
       if (node.action === 'drop' || node.action === 'call') return
-      const name = node.spelling ?? node.name
+      const name = node.quoted ? node.name : (node.spelling ?? node.name)
       const failures: string[] = []
       if (config.format !== undefined && !hasFormat(name, text(config.format)))
         failures.push('use ' + text(config.format))
@@ -92,7 +95,7 @@ const identifier = defineRule('Configure physical identifier conventions.', (con
         else if (node.quoted === undefined && node.origin === 'catalog')
           context.gap('Catalogs cannot establish authored identifier quoting.', node)
       }
-      if (config.qualified === true) {
+      if (config.qualified === true && node.kind !== 'schema') {
         if (node.origin === 'catalog')
           context.gap('Catalog identity cannot establish authored qualification.', node)
         else if (!node.schema) failures.push('qualify the object with its schema')
@@ -156,9 +159,14 @@ const constraintName = defineRule(
       if (config.explicit !== undefined && typeof config.explicit !== 'boolean')
         throw new TypeError('explicit must be boolean')
       if (typeof config.explicit === 'boolean') {
-        if (node.explicit === undefined)
+        const explicit =
+          node.explicit ??
+          ((node.origin === 'sql' || node.origin === 'migration') && node.generated !== undefined
+            ? !node.generated
+            : undefined)
+        if (explicit === undefined)
           context.gap('Explicit constraint naming cannot be established from this evidence.', node)
-        else if (node.explicit !== config.explicit)
+        else if (explicit !== config.explicit)
           report(
             context,
             node,
@@ -169,7 +177,8 @@ const constraintName = defineRule(
       }
       const configured = templates[node.kind] ?? config.template
       if (configured === undefined) return
-      if (!node.name) return context.gap('The final generated name is unavailable.', node)
+      if (!node.name || node.nameKnown === false)
+        return context.gap('The final generated name is unavailable.', node)
       const expected = template(text(configured), node, config)
       if (node.name !== expected)
         report(context, node, 'Name this ' + node.kind + ' ' + expected + '.')

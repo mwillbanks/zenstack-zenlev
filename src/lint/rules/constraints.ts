@@ -19,11 +19,18 @@ const requiredCheck = defineTableRule(
         (candidate) =>
           candidate.kind === 'check' && sameTable(candidate, node) && candidate.action !== 'drop',
       )
-      if (!required.length && !checks.length) report(context, node, 'Add a table CHECK constraint.')
-      for (const name of required) {
-        if (!checks.some((check) => matches(check.name, name)))
-          report(context, node, 'Add CHECK constraint ' + name + '.')
+      if (!required.length && !checks.length) {
+        if (node.checksKnown === false)
+          context.gap('Table CHECK constraints are unavailable.', node)
+        else report(context, node, 'Add a table CHECK constraint.')
       }
+      const missing = required.filter(
+        (name) => !checks.some((check) => check.nameKnown !== false && matches(check.name, name)),
+      )
+      if (!missing.length) return
+      if (node.checksKnown === false || checks.some((check) => check.nameKnown === false))
+        return context.gap('Table CHECK constraint names are unavailable.', node)
+      for (const name of missing) report(context, node, 'Add CHECK constraint ' + name + '.')
     },
   }),
 )

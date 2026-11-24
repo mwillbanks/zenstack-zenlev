@@ -224,3 +224,136 @@ test('schema push runs the lint gate only before executing affected definitions'
     await zenlev.close()
   }
 })
+
+test('write hooks inspect identities with non-cloneable migration metadata', async () => {
+  const authored = await migration(
+    'aaaa',
+    'items',
+    "await ctx.db.schema.createTable('items').addColumn('id', 'text', c => c.primaryKey()).execute()",
+  )
+  const source = await Bun.file(authored.filePath).text()
+  await Bun.write(
+    authored.filePath,
+    source.replace('"custom": {}', '"custom": { transform: () => 1 }'),
+  )
+  const observe = mock(() => undefined)
+  const zenlev = await createZenlev({
+    cwd,
+    adapter: createKyselyAdapter(db, 'sqlite'),
+    plugins: [
+      lintPlugin(),
+      definePlugin({
+        name: 'inspect-write',
+        setup(api) {
+          api.onBeforeWrite((_context, plan) => {
+            expect(plan.command).toBe('migrate apply')
+            if (plan.command === 'migrate apply') {
+              expect(plan.handlers[0]?.migration).toMatchObject({
+                id: 'aaaa',
+                filePath: authored.filePath,
+              })
+              expect(plan.handlers[0]?.migration).not.toHaveProperty('custom')
+            }
+            observe()
+          })
+        },
+      }),
+    ],
+  })
+  try {
+    expect((await zenlev.migrate.apply()).status).toBe('ok')
+    expect(observe).toHaveBeenCalledTimes(1)
+  } finally {
+    await zenlev.close()
+  }
+})
+
+test('write lint vetoes dropping an index that covers a foreign key', async () => {
+  sqlite.exec(`
+    CREATE TABLE customers (id TEXT PRIMARY KEY NOT NULL);
+    CREATE TABLE items (id TEXT PRIMARY KEY NOT NULL, customer_id TEXT REFERENCES customers(id));
+    CREATE INDEX items_customer ON items (customer_id);
+  `)
+  await migration(
+    'aaaa',
+    'remove_index',
+    "await ctx.db.schema.dropIndex('items_customer').execute()",
+  )
+  const zenlev = await createZenlev({
+    cwd,
+    adapter: createKyselyAdapter(db, 'sqlite'),
+    plugins: [lintPlugin()],
+    lint: { rules: { 'zenlev/keys/foreign-key-index': 'error' } },
+  })
+  try {
+    const result = await zenlev.migrate.apply()
+    expect(result.status).toBe('failed')
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ruleId: 'zenlev/keys/foreign-key-index', severity: 'error' }),
+      ]),
+    )
+    expect(
+      sqlite.query("SELECT name FROM sqlite_schema WHERE name = 'items_customer'").all(),
+    ).toHaveLength(1)
+  } finally {
+    await zenlev.close()
+  }
+})
+
+test('write lint applies overrides to catalog-style qualified index identities', async () => {
+  sqlite.exec('CREATE TABLE items (id TEXT PRIMARY KEY NOT NULL);')
+  await migration(
+    'aaaa',
+    'add_index',
+    "await ctx.db.schema.createIndex('Nonstandard').on('items').column('id').execute()",
+  )
+  const zenlev = await createZenlev({
+    cwd,
+    adapter: createKyselyAdapter(db, 'sqlite'),
+    plugins: [lintPlugin()],
+    lint: {
+      rules: { 'zenlev/naming/identifier': ['error', { kinds: ['index'], format: 'snake_case' }] },
+      overrides: [
+        { identities: ['main.items.Nonstandard'], rules: { 'zenlev/naming/identifier': 'off' } },
+      ],
+    },
+  })
+  try {
+    const result = await zenlev.migrate.apply()
+    expect(result.status).toBe('ok')
+    expect(
+      sqlite.query("SELECT name FROM sqlite_schema WHERE name = 'Nonstandard'").all(),
+    ).toHaveLength(1)
+  } finally {
+    await zenlev.close()
+  }
+})
+
+test('write lint forgets indexes removed by an earlier table drop', async () => {
+  sqlite.exec(`
+    CREATE TABLE items (id TEXT PRIMARY KEY NOT NULL);
+    CREATE INDEX items_id ON items (id);
+  `)
+  await migration(
+    'aaaa',
+    'drop_items',
+    `
+    await ctx.db.schema.dropTable('items').execute()
+    await ctx.db.schema.dropIndex('items_id').ifExists().execute()
+  `,
+  )
+  const zenlev = await createZenlev({
+    cwd,
+    adapter: createKyselyAdapter(db, 'sqlite'),
+    plugins: [lintPlugin()],
+  })
+  try {
+    expect((await zenlev.migrate.apply()).status).toBe('ok')
+    expect(
+      sqlite.query("SELECT name FROM sqlite_schema WHERE name IN ('items', 'items_id')").all(),
+    ).toEqual([])
+  } finally {
+    await zenlev.close()
+  }
+})

@@ -38,6 +38,14 @@ test('audits SQLite keys, constraints, indexes, attached namespaces, and exact l
       CREATE TABLE secondary.zenlev_migrations (id TEXT PRIMARY KEY);
     `)
     const result = await readBuiltinLintCatalog({ adapter })
+    for (const table of ['parents', 'composite', 'reversed'])
+      expect(
+        result.nodes.find((node) => node.kind === 'column' && node.table === table)?.nullable,
+      ).toBe(true)
+    for (const table of ['children', 'no_rowid'])
+      expect(
+        result.nodes.find((node) => node.kind === 'column' && node.table === table)?.nullable,
+      ).toBe(false)
     expect(result.nodes).toContainEqual(
       expect.objectContaining({
         kind: 'primary-key',
