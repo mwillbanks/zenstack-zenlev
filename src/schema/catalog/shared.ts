@@ -37,7 +37,10 @@ export function literalDefault(value: string | null): ColumnDefault | undefined 
     return { kind: 'literal', value: hexadecimal[1] === '-' ? -integer : integer }
   }
   if (/^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(castless) && Number.isFinite(Number(castless))) {
-    return { kind: 'literal', value: Number(castless) }
+    const number = Number(castless)
+    if (/^[+-]?\d+$/.test(castless) && !Number.isSafeInteger(number))
+      return { kind: 'sql', sql: normalized }
+    return { kind: 'literal', value: number }
   }
   return { kind: 'sql', sql: normalized }
 }

@@ -87,6 +87,12 @@ export function extractStatement(
   const objectKind = tokens[typeIndex]!.value.toUpperCase()
   let nameIndex = typeIndex + 1
   if (objectKind === 'EVENT' && keyword(tokens[nameIndex], 'TRIGGER')) nameIndex++
+  if (
+    objectKind === 'INDEX' &&
+    dialect === 'postgresql' &&
+    keyword(tokens[nameIndex], 'CONCURRENTLY')
+  )
+    nameIndex++
   while (['IF', 'NOT', 'EXISTS', 'ONLY'].some((word) => keyword(tokens[nameIndex], word)))
     nameIndex++
   const item = identifier(tokens, nameIndex)
@@ -261,6 +267,15 @@ export function extractStatement(
       unique: position(tokens.slice(0, typeIndex), 'UNIQUE') >= 0,
       partial: position(tokens, 'WHERE') >= 0,
     })
+    if (action === 'drop' && dialect === 'postgresql') {
+      let next = item.end
+      while (keyword(tokens[next], ',')) {
+        const index = identifier(tokens, next + 1)
+        if (!index) break
+        make('index', index)
+        next = index.end
+      }
+    }
   }
   return { nodes, gaps }
 }

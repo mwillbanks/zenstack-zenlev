@@ -12,11 +12,11 @@
     }
   },
   "zenlev-migration-authoring": {
-    "reason": "Verified static migration initialization analysis and the lint rule reference against the follow-up regressions.",
+    "reason": "Verified module initialization warnings for class, member, and legacy parameter decorators.",
     "files": {
       "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
       "src/lint/project.ts": "a442054ac441684e36aed583cf646bee87ec8e70908b20f8a8d4fd43f581eef2",
-      "src/lint/source/migration.ts": "e52e5d79b3429164531ca596177018924cd7385725e36c125e424afac5a223fe",
+      "src/lint/source/migration.ts": "373cbf19b2a00c03dbca90ae2e23f41fa60b91b483a28100e0253bd663213bca",
       "src/lint/zmodel.ts": "7830287f86eec7153c5c85e22d69612adc29054103894eb90b482947c9ebc12f",
       "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
       "src/migrate/files.ts": "02eb7ce82e97b2f81c322e375c90219dc894b63315636068da763afedfb1bfa3",
@@ -29,11 +29,11 @@
     }
   },
   "zenlev-plugin-authoring": {
-    "reason": "Verified qualified identity selectors, RLS policy scope, and the lint rule reference.",
+    "reason": "Verified that offline lint and write plans resolve index drops consistently before applying policy.",
     "files": {
       "src/engine.ts": "1ad09e9341a1053208bfa608dae83c3b9aaf74fa42c87bf70af3d51705b41bb8",
-      "src/lint/plugin.ts": "1b10a800f85ab8d2b0d5083ec477616150d338df580741fe88ec6b7d26b138a0",
-      "src/lint/runner.ts": "2ce9f2f322b12170e5c6ee694194991bdc366a10e69fa8e8ea42428af2175c55",
+      "src/lint/plugin.ts": "f58991315764d4592d092593b6a6313b3a44271815df55f52b7c2d72fae11374",
+      "src/lint/runner.ts": "38a96ed0fb08e6ab63158b8d08850721f62f6c08dcbc2cbccf6d0f7dd042bf47",
       "src/lint/types.ts": "27f4343f81fb9cee7d64414013bc79c9c8a32ffe615fcbff088b834b5293110c",
       "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
       "src/plugins.ts": "1b20e976048e706635e7650a86357e9a69c910493d463d2e1ea2676fd4286778",

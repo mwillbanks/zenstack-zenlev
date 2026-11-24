@@ -346,6 +346,64 @@ test('tests custom rule visitors, scope and coverage through the packaged API', 
   ).rejects.toThrow('Unknown message')
 })
 
+test.each(['postgresql', 'sqlite'] as const)(
+  'checks offline index drops in %s',
+  async (dialect) => {
+    await write(
+      'schema.sql',
+      `
+    CREATE TABLE customers (id INT PRIMARY KEY);
+    CREATE TABLE items (customer_id INT REFERENCES customers(id));
+    CREATE INDEX items_customer ON items(customer_id);
+    DROP INDEX items_customer;
+  `,
+    )
+    const result = await lintProject({
+      cwd,
+      lint: {
+        zmodel: false,
+        migrations: false,
+        dialect,
+        sql: ['schema.sql'],
+        presets: [],
+        rules: { 'zenlev/keys/foreign-key-index': 'error' },
+      },
+    })
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({ ruleId: 'zenlev/keys/foreign-key-index', severity: 'error' }),
+    ])
+  },
+)
+
+test('accounts for concurrent and multi-index PostgreSQL drops', async () => {
+  await write(
+    'schema.sql',
+    `
+    CREATE TABLE customers (id INT PRIMARY KEY);
+    CREATE TABLE items (customer_id INT REFERENCES customers(id));
+    CREATE INDEX CONCURRENTLY first_index ON items(customer_id);
+    CREATE INDEX second_index ON items(customer_id);
+    CREATE INDEX third_index ON items(customer_id);
+    DROP INDEX CONCURRENTLY IF EXISTS first_index;
+    DROP INDEX second_index, third_index;
+  `,
+  )
+  const result = await lintProject({
+    cwd,
+    lint: {
+      zmodel: false,
+      migrations: false,
+      dialect: 'postgresql',
+      sql: ['schema.sql'],
+      presets: [],
+      rules: { 'zenlev/keys/foreign-key-index': 'error' },
+    },
+  })
+  expect(result.diagnostics).toEqual([
+    expect.objectContaining({ ruleId: 'zenlev/keys/foreign-key-index', severity: 'error' }),
+  ])
+})
+
 test('blocks definite SQL routine calls when configured', async () => {
   await write('database/routines.sql', 'SELECT app.forbidden_routine();')
   const config: LintConfig = {

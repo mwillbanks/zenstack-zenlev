@@ -166,7 +166,11 @@ export async function readMigrationLintInputs(
       if (node.name && ts.isComputedPropertyName(node.name))
         inspectInitialization(node.name.expression)
       for (const decorator of ts.canHaveDecorators(node) ? (ts.getDecorators(node) ?? []) : [])
-        inspectInitialization(decorator.expression)
+        inspectInitialization(decorator)
+      if (!ts.isPropertyDeclaration(node))
+        for (const parameter of node.parameters)
+          for (const decorator of ts.getDecorators(parameter) ?? [])
+            inspectInitialization(decorator)
       if (
         ts.isPropertyDeclaration(node) &&
         node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword) &&
@@ -176,6 +180,7 @@ export async function readMigrationLintInputs(
       return
     }
     if (
+      ts.isDecorator(node) ||
       ts.isCallExpression(node) ||
       ts.isNewExpression(node) ||
       ts.isTaggedTemplateExpression(node) ||

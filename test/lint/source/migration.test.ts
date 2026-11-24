@@ -90,6 +90,28 @@ describe('migration source inspection', () => {
     ])
   })
 
+  test.each([
+    ['@decorate class {}', '@decorate'],
+    ['(class { @decorate method() {} })', '@decorate'],
+    ['(class { @decorate field = deferred() })', '@decorate'],
+    ['(class { constructor(@decorate value: string) {} })', '@decorate'],
+    ['(class { method(@factory() value: string) {} })', '@factory()'],
+  ])('reports eager decorator applications in %s', async (initializer, decorator) => {
+    const body = 'const value = ' + initializer + '; export function up() {}'
+    const input = await migration(body)
+    const offset = body.indexOf(decorator)
+    expect(input.gaps).toEqual([
+      expect.objectContaining({
+        message: 'Top-level migration initialization may execute before lint enforcement.',
+        source: expect.objectContaining({
+          line: 1,
+          column: offset + 1,
+          endColumn: offset + decorator.length + 1,
+        }),
+      }),
+    ])
+  })
+
   test('never imports modules and respects handler direction', async () => {
     const input = await migration(
       "import { sql as query } from 'kysely'; throw new Error('must never run'); export async function up(ctx) { await query.raw('CREATE TABLE users (id text PRIMARY KEY)').execute(ctx.db.kysely) } export async function down(ctx) { await query.raw('DROP TABLE users').execute(ctx.db.kysely) }",

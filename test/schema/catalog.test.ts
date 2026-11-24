@@ -157,6 +157,7 @@ test('reads MySQL temporal literals separately from generated default expression
 })
 
 test.each([
+  ['42', 42],
   ['0x2a', 42],
   ['+0x2A', 42],
   ['-0x2a', -42],
@@ -166,11 +167,14 @@ test.each([
   ['-0x1fffffffffffff', Number.MIN_SAFE_INTEGER],
   ['0xffe0000000000001', Number.MIN_SAFE_INTEGER],
   ['-0xffe0000000000001', Number.MAX_SAFE_INTEGER],
-] as const)('normalizes SQLite hexadecimal default %s', (source, value) => {
+] as const)('normalizes exact SQLite integer default %s', (source, value) => {
   expect(literalDefault(source)).toEqual({ kind: 'literal', value })
 })
 
 test.each([
+  '9007199254740992',
+  '9007199254740993',
+  '-9007199254740993',
   '0x20000000000000',
   '0x20000000000001',
   '-0x20000000000000',
@@ -179,7 +183,7 @@ test.each([
   '0x8000000000000000',
   '-0x8000000000000000',
   '0xffdfffffffffffff',
-])('preserves unsafe SQLite hexadecimal default %s without rounding', (source) => {
+])('preserves unsafe SQLite integer default %s without rounding', (source) => {
   expect(literalDefault(source)).toEqual({ kind: 'sql', sql: source })
   expect(literalDefault(source)).not.toEqual({ kind: 'literal', value: 9007199254740992 })
 })

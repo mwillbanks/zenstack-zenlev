@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { identity as qualifiedIdentity } from '../identity'
+import { resolveIndexDrops } from './indexes'
 import { builtinPresets, builtinRules } from './rules'
 import type {
   LintConfig,
@@ -281,8 +282,9 @@ async function evaluate(
   let suppressed = 0
   const appliedExceptions = new Set<LintException>()
   for (const batch of batches) {
-    const nodes = structuredClone(batch.nodes)
-    const relevant = [...structuredClone(batch.context ?? []), ...nodes]
+    const catalog = structuredClone(batch.context ?? [])
+    const nodes = resolveIndexDrops(structuredClone(batch.nodes), catalog)
+    const relevant = [...catalog, ...nodes]
     const available = batch.capabilities ?? []
     for (const capability of available) capabilities.add(capability)
     for (const gap of batch.gaps)

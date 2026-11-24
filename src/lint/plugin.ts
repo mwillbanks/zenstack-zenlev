@@ -62,29 +62,9 @@ async function plannedInputs(
 
 function resolveWriteNamespaces(
   nodes: readonly LintNode[],
-  catalog: LintInput,
+  schema: string | undefined,
 ): readonly LintNode[] {
-  const indexes = new Map<string, LintNode>()
-  for (const node of catalog.nodes)
-    if (node.kind === 'index') indexes.set(identity(node.schema, node.name), node)
-
   return nodes.map((node) => {
-    const schema = node.schema ?? catalog.defaultSchema
-    if (node.kind === 'index') {
-      // PostgreSQL and SQLite DROP INDEX identify an index by schema and name.
-      const key = identity(schema, node.name)
-      const table = node.table ?? indexes.get(key)?.table
-      const resolved = table
-        ? { ...node, schema, table, identity: identity(schema, table, node.name) }
-        : { ...node, schema, identity: key }
-      if (node.action === 'drop') indexes.delete(key)
-      else indexes.set(key, resolved)
-      return resolved
-    }
-    if (node.kind === 'table' && node.action === 'drop') {
-      for (const [key, index] of indexes)
-        if (index.schema === schema && index.table === node.name) indexes.delete(key)
-    }
     if (
       !schema ||
       node.schema ||
@@ -121,7 +101,7 @@ export function lintPlugin() {
           : { nodes: [], gaps: [] }
         const result = await run([
           {
-            nodes: resolveWriteNamespaces(nodes, catalog),
+            nodes: resolveWriteNamespaces(nodes, catalog.defaultSchema),
             gaps: [...gaps, ...catalog.gaps],
             capabilities: [...capabilities, ...(catalog.capabilities ?? [])],
             context: catalog.nodes,
