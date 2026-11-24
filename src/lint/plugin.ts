@@ -24,14 +24,24 @@ async function plannedInputs(
     return inputs
   }
   const inputs: LintInput[] = []
+  if (plan.evidence && plan.evidence.length !== plan.statements.length)
+    throw new Error('Generated write evidence does not match the final SQL plan')
   for (const [index, statement] of plan.statements.entries()) {
+    const source = {
+      path: '<db push>',
+      line: index + 1,
+      column: 1,
+      fingerprint: createHash('sha256').update(statement).digest('hex'),
+    }
+    const evidence = plan.evidence?.[index]
     inputs.push(
-      await parseSqlLintInput(statement, adapter.dialect, {
-        path: '<db push>',
-        line: index + 1,
-        column: 1,
-        fingerprint: createHash('sha256').update(statement).digest('hex'),
-      }),
+      evidence
+        ? {
+            ...evidence,
+            nodes: evidence.nodes.map((node) => ({ ...node, source })),
+            gaps: evidence.gaps.map((gap) => ({ ...gap, source })),
+          }
+        : await parseSqlLintInput(statement, adapter.dialect, source),
     )
   }
   const schema = plan.zmodel

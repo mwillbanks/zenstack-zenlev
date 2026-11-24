@@ -2,6 +2,7 @@ import { afterEach, expect, mock, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { CompiledQuery, Kysely, MysqlDialect, PostgresDialect } from 'kysely'
 import { buildChangeSet, type ChangeSetOptions, type SchemaChangeSet } from '../../src/schema/diff'
+import { readStatementEvidence } from '../../src/schema/diff/evidence'
 import type {
   SchemaColumn,
   SchemaForeignKey,
@@ -636,3 +637,205 @@ test('treats enums as text on SQLite and supports nullable SQL-default columns o
   expect(postgres.blockers).toEqual([])
   expect(sqlOf(postgres)).toContain('default now()')
 })
+
+test.each(['sqlite', 'postgresql', 'mysql'] as const)(
+  '%s emits ordered structured facts outside the public change-set JSON',
+  (dialect) => {
+    const previous = table('items', {
+      columns: [
+        column(),
+        column('old_value'),
+        column('value', {
+          type: 'text',
+          nullable: true,
+          default: { kind: 'literal', value: 'old' },
+        }),
+      ],
+      indexes: [{ name: 'old_index', columns: ['value'], unique: false }],
+    })
+    const desired = table('items', {
+      columns: [
+        column(),
+        column('new_value', { nullable: true }),
+        column('value', {
+          type: dialect === 'sqlite' ? 'text' : 'varchar(24)',
+          nullable: dialect === 'sqlite',
+          ...(dialect === 'sqlite' ? { default: { kind: 'literal' as const, value: 'old' } } : {}),
+        }),
+      ],
+      indexes: [{ name: 'new_index', columns: ['new_value'], unique: false }],
+    })
+    const plan = diff(model(dialect, [previous]), model(dialect, [desired]))
+    expect(plan.blockers).toEqual([])
+    for (const operation of plan.operations) {
+      const inputs = readStatementEvidence(operation)
+      expect(inputs).toHaveLength(operation.up.length)
+      expect(inputs.every((input) => input.nodes.length > 0 && input.gaps.length === 0)).toBe(true)
+      expect(JSON.stringify(operation)).not.toContain('"evidence"')
+    }
+    const facts = plan.operations.flatMap(readStatementEvidence).flatMap((input) => input.nodes)
+    expect(facts).toContainEqual(
+      expect.objectContaining({ kind: 'column', name: 'old_value', action: 'drop' }),
+    )
+    expect(facts).toContainEqual(
+      expect.objectContaining({
+        kind: 'column',
+        name: 'new_value',
+        action: 'alter',
+        nullable: true,
+      }),
+    )
+    expect(facts).toContainEqual(
+      expect.objectContaining({ kind: 'index', name: 'old_index', action: 'drop', table: 'items' }),
+    )
+    expect(facts).toContainEqual(
+      expect.objectContaining({
+        kind: 'index',
+        name: 'new_index',
+        action: 'create',
+        columns: ['new_value'],
+      }),
+    )
+    if (dialect === 'postgresql') {
+      const operation = plan.operations.find(({ kind }) => kind === 'alter-column')!
+      const columns = readStatementEvidence(operation).map((input) =>
+        input.nodes.find((node) => node.kind === 'column')!,
+      )
+      expect(columns).toHaveLength(3)
+      expect(columns[0]).toMatchObject({ type: 'varchar(24)' })
+      expect(Object.hasOwn(columns[0]!, 'default')).toBe(false)
+      expect(Object.hasOwn(columns[1]!, 'default')).toBe(true)
+      expect(columns[1]!.default).toBeUndefined()
+      expect(columns[2]).toMatchObject({ nullable: false })
+    }
+  },
+)
+
+test.each(['sqlite', 'postgresql', 'mysql'] as const)(
+  '%s records physical keys and emitted constraint names without SQL parsing',
+  (dialect) => {
+    const target = model(dialect, [
+      table('parents', { columns: [column('id', { type: 'text' })] }),
+      table('children', {
+        columns: [column('id', { autoIncrement: true }), column('parent_id')],
+        foreignKeys: [foreign],
+        indexes: [{ columns: ['parent_id'], unique: false }],
+      }),
+    ])
+    const plan = diff(model(dialect), target)
+    expect(plan.blockers).toEqual([])
+    const nodes = plan.operations.flatMap(readStatementEvidence).flatMap((input) => input.nodes)
+    expect(nodes).toContainEqual(
+      expect.objectContaining({
+        kind: 'column',
+        table: 'children',
+        name: 'id',
+        sequential: true,
+        quoted: true,
+      }),
+    )
+    expect(nodes).toContainEqual(
+      expect.objectContaining({
+        kind: 'foreign-key',
+        name: 'child_parent_fk',
+        targetTable: 'parents',
+        targetColumns: ['id'],
+      }),
+    )
+    expect(nodes).toContainEqual(
+      expect.objectContaining({
+        kind: 'index',
+        table: 'children',
+        generated: false,
+        explicit: true,
+      }),
+    )
+    const primary = nodes.find((node) => node.kind === 'primary-key' && node.table === 'children')!
+    expect(primary.columns).toEqual(['id'])
+    expect(primary.generated).toBe(dialect === 'sqlite')
+    expect(primary.explicit).toBe(dialect !== 'sqlite')
+    const dropped = diff(target, model(dialect), { dropTables: ['children'] })
+    expect(
+      dropped.operations.flatMap(readStatementEvidence).flatMap((input) => input.nodes),
+    ).toContainEqual(expect.objectContaining({ kind: 'table', name: 'children', action: 'drop' }))
+    expect(diff(target, target, { dropMissingTables: 'skip' }).operations).toEqual([])
+  },
+)
+
+test('requires evidence for the exact generated operation object', () => {
+  expect(() =>
+    readStatementEvidence({
+      id: 'external',
+      kind: 'external',
+      up: [{ sql: 'select 1', parameters: [] }],
+      warnings: [],
+    }),
+  ).toThrow('Missing generated statement evidence')
+})
+
+test.each(['postgresql', 'mysql'] as const)(
+  '%s drops the unique constraint and its catalog index together',
+  (dialect) => {
+    const original = table('items', {
+      indexes: [{ name: 'items_id_unique', columns: ['id'], unique: true, constraint: true }],
+    })
+    const plan = diff(model(dialect, [original]), model(dialect, [table()]))
+    const operation = plan.operations.find(({ kind }) => kind === 'drop-index')!
+    const nodes = readStatementEvidence(operation).flatMap((input) => input.nodes)
+    expect(nodes).toContainEqual(
+      expect.objectContaining({
+        kind: 'unique',
+        action: 'drop',
+        identity: 'items.items_id_unique',
+      }),
+    )
+    expect(nodes).toContainEqual(
+      expect.objectContaining({ kind: 'index', action: 'drop', identity: 'items.items_id_unique' }),
+    )
+  },
+)
+
+test.each(['sqlite', 'postgresql', 'mysql'] as const)(
+  '%s structured columns match the emitted SQL expression semantics',
+  async (dialect) => {
+    const target = model(dialect, [
+      table('items', {
+        columns: [
+          column('id', { nullable: true }),
+          column('value', {
+            type: 'text',
+            nullable: true,
+            default: { kind: 'literal', value: null },
+          }),
+          column('active', { type: 'boolean', default: { kind: 'literal', value: true } }),
+          column('created_at', {
+            type: 'timestamp',
+            default: { kind: 'sql', sql: 'CURRENT_TIMESTAMP' },
+          }),
+        ],
+      }),
+    ])
+    const operation = diff(model(dialect), target).operations.find(
+      ({ kind }) => kind === 'create-table',
+    )!
+    const input = readStatementEvidence(operation)[0]!
+    const { parseSqlLintInput } = await import('../../src/lint/source/sql')
+    const parsed = await parseSqlLintInput(operation.up[0]!.sql, dialect, {
+      path: '<parity>',
+      line: 1,
+      column: 1,
+    })
+    expect(parsed.gaps).toEqual([])
+    const project = (nodes: typeof input.nodes) =>
+      nodes
+        .filter((node) => node.kind === 'column')
+        .map((node) => ({
+          name: node.name,
+          type: node.type,
+          nullable: node.nullable,
+          sequential: node.sequential,
+          default: node.default,
+        }))
+    expect(project(input.nodes)).toEqual(project(parsed.nodes))
+  },
+)

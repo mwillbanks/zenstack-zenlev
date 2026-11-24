@@ -155,6 +155,80 @@ await ctx.db.kysely.schema.createTable('${namespace}.BadTable').addColumn('id', 
     }
   })
 
+  test('vetoes every generated push statement before nontransactional MySQL DDL', async () => {
+    const namespace = 'zenlev_lint_push'
+    const cwd = await mkdtemp(join(import.meta.dir, '.zenlev-push-mysql-'))
+    const admin = new Kysely<any>({
+      dialect: new MysqlDialect({ pool: createPool({ uri: mysqlUrl!, connectionLimit: 1 }) }),
+    })
+    const url = new URL(mysqlUrl!)
+    url.pathname = '/' + namespace
+    let db: Kysely<any> | undefined
+    let service: { close(): Promise<void> } | undefined
+    try {
+      await sql.raw('DROP DATABASE IF EXISTS ' + namespace).execute(admin)
+      await sql.raw('CREATE DATABASE ' + namespace).execute(admin)
+      db = new Kysely({
+        dialect: new MysqlDialect({ pool: createPool({ uri: url.href, connectionLimit: 2 }) }),
+      })
+      await Bun.write(
+        join(cwd, 'schema.zmodel'),
+        `
+datasource db { provider = "mysql" }
+model First { id String @id @@map("aa_before_violation") }
+model Last { id String @id @@map("zz_BadTable") }
+`,
+      )
+      const adapter = createKyselyAdapter(db, 'mysql')
+      const blockedService = await createZenlev({
+        cwd,
+        adapter,
+        lint: { zmodel: false },
+        plugins: [lintPlugin()],
+      })
+      service = blockedService
+      const blocked = await blockedService.db.push()
+      expect(blocked.status).toBe('blocked')
+      expect(blocked.diagnostics).toContainEqual(
+        expect.objectContaining({ ruleId: 'zenlev/naming/table-case', severity: 'error' }),
+      )
+      const unchanged = await sql<{
+        count: string
+      }>`SELECT COUNT(*) AS count FROM information_schema.TABLES WHERE TABLE_SCHEMA = ${namespace} AND TABLE_NAME IN ('aa_before_violation', 'zz_BadTable')`.execute(
+        db,
+      )
+      expect(Number(unchanged.rows[0]?.count)).toBe(0)
+      await blockedService.close()
+      const warningService = await createZenlev({
+        cwd,
+        adapter,
+        plugins: [lintPlugin()],
+        lint: { zmodel: false, rules: { 'zenlev/naming/table-case': 'warn' } },
+      })
+      service = warningService
+      const applied = await warningService.db.push()
+      expect(applied.status).toBe('applied')
+      expect(applied.diagnostics).toContainEqual(
+        expect.objectContaining({ ruleId: 'zenlev/naming/table-case', severity: 'warn' }),
+      )
+      const written = await sql<{
+        count: string
+      }>`SELECT COUNT(*) AS count FROM information_schema.TABLES WHERE TABLE_SCHEMA = ${namespace} AND TABLE_NAME IN ('aa_before_violation', 'zz_BadTable')`.execute(
+        db,
+      )
+      expect(Number(written.rows[0]?.count)).toBe(2)
+    } finally {
+      try {
+        await service?.close()
+        await db?.destroy()
+        await sql.raw('DROP DATABASE IF EXISTS ' + namespace).execute(admin)
+      } finally {
+        await admin.destroy()
+        await rm(cwd, { recursive: true, force: true })
+      }
+    }
+  })
+
   test('requires an explicit namespace when the connection has no default database', async () => {
     const url = new URL(mysqlUrl!)
     url.pathname = '/'

@@ -55,6 +55,8 @@ export type WritePlan =
   | {
       readonly command: 'db push'
       readonly statements: readonly string[]
+      /** Ordered structured facts for each generated forward statement. */
+      readonly evidence?: readonly LintInput[]
       readonly desired: SchemaModel
       readonly affected: readonly string[]
       readonly zmodel?: LintInput

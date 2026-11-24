@@ -12,51 +12,67 @@
     }
   },
   "zenlev-linting": {
-    "reason": "Verified SQL evidence inside computed import arguments while retaining opaque module warnings.",
+    "reason": "Reviewed parser requirements, structured migration analysis, statement indexed push evidence, and updated project setup guidance.",
     "files": {
+      "README.md": "18d0299a9501e3d3b3f8cf8944dbb38159fc6b85cf3b3577bf1eaa69c7dd7887",
       "package.json": "6da71ebe1fa047b7bb97326b06043a5cda6f3be165d16155a7e1c55e0f5e6585",
-      "src/lint/plugin.ts": "f58991315764d4592d092593b6a6313b3a44271815df55f52b7c2d72fae11374",
+      "src/lint/plugin.ts": "75ac041b9b00b5c95b08a7d76ebada51186aa2bde0bc0ae7d494a21cb62d23ce",
       "src/lint/project.ts": "a442054ac441684e36aed583cf646bee87ec8e70908b20f8a8d4fd43f581eef2",
       "src/lint/rules.ts": "807cf21c7b1b53da5ed6e61b8c91a8cb9ab09432130a5c8928f5bbbef42448a6",
       "src/lint/runner.ts": "f4089d99494250bb41084e3eed85ba10339610b6be718594f81d3f2b581e1cdf",
-      "src/lint/source/migration.ts": "d37ac42b1b452506fbd69bebb69629b8c7425759b7a9069fee758c50720b59a5",
-      "website/content/docs/guides/_skills/zenlev-linting/SKILL.md": "46df7ab14916f79fbb6a635e1ae4da902aeb188609d6b91970882f3ce23c3807",
-      "website/content/docs/guides/linting.mdx": "7a5990586a1e42540f1df2ec830b8dbc3e988364291e6aa1d5ce4a77ff70f01d",
+      "src/lint/source/kysely/ast.ts": "25117ad39266a1170d557f3b8407abe96b1e70cc65acd34fc283ee0d2710537e",
+      "src/lint/source/kysely/context.ts": "9962b462453a443f6fc63c6ebf38df39c2334973d0eb33f4ad9c6417b230ac01",
+      "src/lint/source/kysely/table.ts": "2a8acede0384d0140fd824ee6dc09a798bc949c6d5b9c25e418a7eec6a87db2a",
+      "src/lint/source/migration.ts": "1f11935b8ad6479a682a52a359baeeb03d2da5f0b949473448ed647b22d6b675",
+      "src/lint/source/sql.ts": "a566db64f231fc2797af1d0b9f764a284709e1c9fcd4748e6ef5b31061d8a036",
+      "src/lint/source/statement.ts": "d929f8683ff6106d802b4c7a3b914dfbcdbbf9cee86c6b344b62cc854f0d5a8f",
+      "src/schema/commands.ts": "15e57bc4189cd17f367bc9b22144e5b59563e901bb9a55cd28b28099991bc980",
+      "src/schema/diff.ts": "c5ba2b05939fcb4dc0768672075e457053e8ef2ac4f1ef349b84c1532e5eba0b",
+      "src/schema/diff/evidence.ts": "f862f30a98436d00b29598a9c906b126780c706ae72020cae8983392970b2ffe",
+      "website/content/docs/guides/_skills/zenlev-linting/SKILL.md": "cb90353c9525926b4751b12da59e61eb975a1cd45016929c81deb2a03fc1ad30",
+      "website/content/docs/guides/linting.mdx": "e8dc4ba7818a8d4568d043f57341e1b995ee51ac2695ebdad5c993138a20aa84",
       "website/content/docs/reference/lint-rules.mdx": "5f404c61671ca76b66664508c1b3a52e97a6eb7d8c0d90fcb1f95eaba8d857f9"
     }
   },
   "zenlev-migration-authoring": {
-    "reason": "Verified SQL evidence inside computed import arguments while retaining opaque module warnings.",
+    "reason": "Reviewed Oxc static migration analysis and parser requirements for raw SQL and structured generated schema operations.",
     "files": {
       "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
       "src/lint/project.ts": "a442054ac441684e36aed583cf646bee87ec8e70908b20f8a8d4fd43f581eef2",
-      "src/lint/source/migration.ts": "d37ac42b1b452506fbd69bebb69629b8c7425759b7a9069fee758c50720b59a5",
+      "src/lint/source/kysely/ast.ts": "25117ad39266a1170d557f3b8407abe96b1e70cc65acd34fc283ee0d2710537e",
+      "src/lint/source/kysely/context.ts": "9962b462453a443f6fc63c6ebf38df39c2334973d0eb33f4ad9c6417b230ac01",
+      "src/lint/source/kysely/table.ts": "2a8acede0384d0140fd824ee6dc09a798bc949c6d5b9c25e418a7eec6a87db2a",
+      "src/lint/source/migration.ts": "1f11935b8ad6479a682a52a359baeeb03d2da5f0b949473448ed647b22d6b675",
       "src/lint/zmodel.ts": "7830287f86eec7153c5c85e22d69612adc29054103894eb90b482947c9ebc12f",
       "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
       "src/migrate/files.ts": "02eb7ce82e97b2f81c322e375c90219dc894b63315636068da763afedfb1bfa3",
+      "src/schema/diff.ts": "c5ba2b05939fcb4dc0768672075e457053e8ef2ac4f1ef349b84c1532e5eba0b",
+      "src/schema/diff/evidence.ts": "f862f30a98436d00b29598a9c906b126780c706ae72020cae8983392970b2ffe",
       "src/types.ts": "6d587e0c20c9bc05a8f5b60f06811e23fd4d5ea37ee6c8ea28a50d08215b7e18",
-      "website/content/docs/guides/_skills/zenlev-migration-authoring/SKILL.md": "ff5377522b61026db4d31e452f775302536ae34316759c6029b369fdb660b0bd",
-      "website/content/docs/guides/linting.mdx": "7a5990586a1e42540f1df2ec830b8dbc3e988364291e6aa1d5ce4a77ff70f01d",
+      "website/content/docs/guides/_skills/zenlev-migration-authoring/SKILL.md": "bc23f0401d4b0998a60d130ba4de02d9b380166e151c3b8b80e27bff9da2dd2e",
+      "website/content/docs/guides/linting.mdx": "e8dc4ba7818a8d4568d043f57341e1b995ee51ac2695ebdad5c993138a20aa84",
       "website/content/docs/guides/migrations.mdx": "f28c99f690d20c725366ed73312b211d44c43fc05cb127b5bf114d36fbd85a53",
       "website/content/docs/reference/commands.mdx": "43f6fd2566ed74b41778c7774591aa1216e60926dadbe5ab77fb3acf66ad485b",
       "website/content/docs/reference/lint-rules.mdx": "5f404c61671ca76b66664508c1b3a52e97a6eb7d8c0d90fcb1f95eaba8d857f9"
     }
   },
   "zenlev-plugin-authoring": {
-    "reason": "Rechecked the lint rule overview and behavior for opaque migration imports.",
+    "reason": "Reviewed optional statement aligned generated lint evidence in the final db push hook contract.",
     "files": {
       "src/engine.ts": "1ad09e9341a1053208bfa608dae83c3b9aaf74fa42c87bf70af3d51705b41bb8",
-      "src/lint/plugin.ts": "f58991315764d4592d092593b6a6313b3a44271815df55f52b7c2d72fae11374",
+      "src/lint/plugin.ts": "75ac041b9b00b5c95b08a7d76ebada51186aa2bde0bc0ae7d494a21cb62d23ce",
       "src/lint/runner.ts": "f4089d99494250bb41084e3eed85ba10339610b6be718594f81d3f2b581e1cdf",
       "src/lint/types.ts": "27f4343f81fb9cee7d64414013bc79c9c8a32ffe615fcbff088b834b5293110c",
       "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
-      "src/plugins.ts": "1b20e976048e706635e7650a86357e9a69c910493d463d2e1ea2676fd4286778",
+      "src/plugins.ts": "81a521e25374621a66a5509231854764351513bf789e32224c75e54de6b54f7e",
+      "src/schema/diff.ts": "c5ba2b05939fcb4dc0768672075e457053e8ef2ac4f1ef349b84c1532e5eba0b",
+      "src/schema/diff/evidence.ts": "f862f30a98436d00b29598a9c906b126780c706ae72020cae8983392970b2ffe",
       "src/types.ts": "6d587e0c20c9bc05a8f5b60f06811e23fd4d5ea37ee6c8ea28a50d08215b7e18",
-      "website/content/docs/guides/_skills/zenlev-plugin-authoring/SKILL.md": "81329fd863e59a9f055b7ee1d8ced1ad2a698f8007789d775fbb320a0f0dcfb5",
-      "website/content/docs/guides/linting.mdx": "7a5990586a1e42540f1df2ec830b8dbc3e988364291e6aa1d5ce4a77ff70f01d",
+      "website/content/docs/guides/_skills/zenlev-plugin-authoring/SKILL.md": "3188fd62a907721962d7faacca31a8da5cec45a999530fc880b05ed406de5b95",
+      "website/content/docs/guides/linting.mdx": "e8dc4ba7818a8d4568d043f57341e1b995ee51ac2695ebdad5c993138a20aa84",
       "website/content/docs/reference/api.mdx": "f32cb5c0613b8704be3e68ff25e50d91ea5cb3d68e3b6b059dd6dfe3bdffc385",
       "website/content/docs/reference/lint-rules.mdx": "5f404c61671ca76b66664508c1b3a52e97a6eb7d8c0d90fcb1f95eaba8d857f9",
-      "website/content/docs/reference/plugins-telemetry.mdx": "b77e0216a3728562d87212d26627bda0682035fd77918331f5a303e5d6864309"
+      "website/content/docs/reference/plugins-telemetry.mdx": "0a898964f39484ddc5999a0d2801e668a9dc7005ec221a832c1dc05c7675a69d"
     }
   },
   "zenlev-recovery": {
@@ -72,11 +88,11 @@
     }
   },
   "zenlev-schema-diff": {
-    "reason": "Verified discovered namespaces, physical defaults, and catalog blockers across the supported dialects.",
+    "reason": "Reviewed structured lint evidence attached to the final schema push plan and its statement order.",
     "files": {
       "src/schema/catalog.ts": "535e4f8e059c8ff6331578b5e76c3d9b7e75be0ee5e290de71ca19e6d83c95fa",
-      "src/schema/commands.ts": "9587f2b199ba39684a7ae6c9dc2ad3d862bb744d0a5abd547b0e6d28b1823d98",
-      "src/schema/diff.ts": "dacc98143c7355dba8dcbff45ab913862c74a4814c288a53c8136b626d3a4318",
+      "src/schema/commands.ts": "15e57bc4189cd17f367bc9b22144e5b59563e901bb9a55cd28b28099991bc980",
+      "src/schema/diff.ts": "c5ba2b05939fcb4dc0768672075e457053e8ef2ac4f1ef349b84c1532e5eba0b",
       "src/schema/model.ts": "3687e3d3e5a80bde17365912c01ac8aadaa61046d25cb0d792e0405b0886141d",
       "website/content/docs/guides/_skills/zenlev-schema-diff/SKILL.md": "41a8ff5a77cedf37c7573fd3eb8119d0dd9013eafdeaa550cd9ab6fd942303e0",
       "website/content/docs/guides/schema-changes.mdx": "3bcf517c2acab1c524c883e2d92ed2192a01bae1e33bad37a603d462c323ced7",
@@ -84,13 +100,13 @@
     }
   },
   "zenlev-setup": {
-    "reason": "Rechecked lint setup and coverage guidance for opaque migration imports.",
+    "reason": "Reviewed optional SQL parser installation and structured Kysely and schema push lint setup.",
     "files": {
       "src/config.ts": "ace9e91be8b22977f072502fad834ec66234f2b1aecd64db3931b20a6e984d09",
       "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
       "src/types.ts": "6d587e0c20c9bc05a8f5b60f06811e23fd4d5ea37ee6c8ea28a50d08215b7e18",
-      "website/content/docs/guides/_skills/zenlev-setup/SKILL.md": "b785b8bc4ce40d8c242169bc906558e7f056a55b6b2b84d1685db984b56b3ecc",
-      "website/content/docs/guides/linting.mdx": "7a5990586a1e42540f1df2ec830b8dbc3e988364291e6aa1d5ce4a77ff70f01d",
+      "website/content/docs/guides/_skills/zenlev-setup/SKILL.md": "d17715c9af7b9ba2012e2a50545cebef182b9a9437030375e8702ac1f87fa404",
+      "website/content/docs/guides/linting.mdx": "e8dc4ba7818a8d4568d043f57341e1b995ee51ac2695ebdad5c993138a20aa84",
       "website/content/docs/guides/namespaces.mdx": "c515f7c077218f67a4c6f1d3db2d5066ce61cb1113b7a1679bd4ad46c743d5de",
       "website/content/docs/reference/api.mdx": "f32cb5c0613b8704be3e68ff25e50d91ea5cb3d68e3b6b059dd6dfe3bdffc385",
       "website/content/docs/reference/configuration.mdx": "fb36c881ac04b8ffbcfebea7c1a3a5fe07e56f75ff4d6bb1c2b54bc6e4804db8"

@@ -267,7 +267,7 @@ describe('migration source inspection', () => {
     )
     const portable = await readMigrationLintInputs(path, undefined, ['up'])
     expect(node(portable, 'table')).toMatchObject({ name: 'BadTable' })
-    expect(node(portable, 'column').sequential).toBe(false)
+    expect(node(portable, 'column').sequential).toBeUndefined()
     expect(portable.gaps.some((gap) => gap.message.includes('Executed query'))).toBe(true)
   })
   test('folds PostgreSQL identifiers and preserves authored spelling', async () => {
@@ -392,5 +392,224 @@ describe('migration source inspection', () => {
     const link = join(directory, 'linked.ts')
     await symlink(path, link)
     await expect(readMigrationLintInputs(link, 'sqlite', ['up'])).rejects.toThrow('regular file')
+  })
+  test.each(['postgresql', 'mysql', 'sqlite'])(
+    'projects %s builder evidence consistently with SQL declarations',
+    async (dialect) => {
+      const input = await migration(
+        "export async function up(ctx) { await ctx.db.schema.createTable('links').addColumn('left_id','text',c=>c.notNull()).addColumn('right_id','text').addPrimaryKeyConstraint('links_pk',['left_id','right_id']).addUniqueConstraint('links_unique',['right_id']).addForeignKeyConstraint('links_fk',['left_id'],'parents',['id']).execute(); await ctx.db.schema.createIndex('links_idx').on('links').columns(['left_id','right_id']).unique().execute(); }",
+        dialect,
+      )
+      const sql = await parseSqlLintInput(
+        'CREATE TABLE links (left_id text NOT NULL, right_id text, CONSTRAINT links_pk PRIMARY KEY(left_id,right_id), CONSTRAINT links_unique UNIQUE(right_id), CONSTRAINT links_fk FOREIGN KEY(left_id) REFERENCES parents(id)); CREATE UNIQUE INDEX links_idx ON links(left_id,right_id);',
+        dialect,
+        source,
+      )
+      const facts = (items: typeof input.nodes) =>
+        items.map(
+          ({
+            kind,
+            name,
+            table,
+            columns,
+            type,
+            nullable,
+            sequential,
+            unique,
+            targetTable,
+            targetColumns,
+          }) => ({
+            kind,
+            name,
+            table,
+            columns,
+            type,
+            nullable,
+            sequential: !!sequential,
+            unique,
+            targetTable,
+            targetColumns,
+          }),
+        )
+      expect(input.gaps).toEqual([])
+      expect(facts(input.nodes)).toEqual(facts(sql.nodes))
+    },
+  )
+
+  test('keeps mixed raw SQL and structured index operations in execution order', async () => {
+    const input = await migration(
+      "import { sql } from 'kysely'; export async function up(ctx) { await ctx.db.schema.createIndex('links_idx').on('links').column('id').execute(); await sql.raw('DROP INDEX links_idx').execute(ctx.db.kysely); await ctx.db.schema.createTable('next_table').addColumn('id','text').execute(); await sql.raw('DROP TABLE next_table').execute(ctx.db.kysely); }",
+      'postgresql',
+    )
+    expect(input.gaps).toEqual([])
+    expect(
+      input.nodes
+        .filter(({ kind }) => kind !== 'column')
+        .map(({ kind, name, action }) => [kind, name, action]),
+    ).toEqual([
+      ['index', 'links_idx', 'create'],
+      ['index', 'links_idx', 'drop'],
+      ['table', 'next_table', 'create'],
+      ['table', 'next_table', 'drop'],
+    ])
+  })
+
+  test('inspects the selected down builder without evaluating module code', async () => {
+    const input = await migration(
+      "throw new Error('must stay offline'); export async function up(ctx) { await ctx.db.schema.createTable('users').addColumn('id','text').execute(); } export async function down(ctx) { await ctx.db.schema.dropTable('users').execute(); }",
+      'postgresql',
+      ['down'],
+    )
+    expect(input.nodes.map(({ kind, name, action }) => [kind, name, action])).toEqual([
+      ['table', 'users', 'drop'],
+    ])
+    expect(node(input, 'table').source?.fingerprint).toMatch(/^[a-f0-9]{64}$/)
+  })
+
+  test('uses known dialects for SQLite rowid and serial inference', async () => {
+    const path = join(directory, 'dialect-facts.ts')
+    await Bun.write(
+      path,
+      "export async function up(ctx) { await ctx.db.schema.createTable('users').addColumn('id','integer',c=>c.primaryKey()).addColumn('other','serial').execute(); }",
+    )
+    const portable = await readMigrationLintInputs(path, undefined, ['up'])
+    expect(node(portable, 'column', 'id').sequential).toBeUndefined()
+    expect(node(portable, 'column', 'other').sequential).toBeUndefined()
+    expect(portable.gaps).toEqual([])
+    const sqlite = await readMigrationLintInputs(path, 'sqlite', ['up'])
+    expect(node(sqlite, 'column', 'id')).toMatchObject({ sequential: true, nullable: false })
+    expect(node(sqlite, 'column', 'other').sequential).toBeUndefined()
+    const postgres = await readMigrationLintInputs(path, 'postgresql', ['up'])
+    expect(node(postgres, 'column', 'id')).toMatchObject({ sequential: false, nullable: false })
+    expect(node(postgres, 'column', 'other').sequential).toBe(true)
+  })
+
+  test('analyzes embedded expressions without reconstructing a SQL statement', async () => {
+    const input = await migration(
+      "import { sql } from 'kysely'; export async function up(ctx) { await ctx.db.schema.withSchema('app').createTable('users').addColumn('id','bigint',c=>c.primaryKey().defaultTo(sql.raw(\"pg_catalog.nextval('users_id_seq')\"))).addColumn('value','text',c=>c.defaultTo(sql.raw('app.compute_value()'))).addCheckConstraint('users_check',sql.raw('app.allowed(value)')).execute(); }",
+      'postgresql',
+    )
+    expect(node(input, 'column', 'id').sequential).toBe(true)
+    expect(
+      input.nodes.filter(({ kind }) => kind === 'function').map(({ identity }) => identity),
+    ).toEqual(['pg_catalog.nextval', 'app.compute_value', 'app.allowed'])
+    expect(input.gaps).toEqual([])
+    expect(input.nodes.every(({ source }) => source?.line === 1 && source.fingerprint)).toBe(true)
+  })
+
+  test('gaps opaque modifier roots and missing or dynamic index definitions', async () => {
+    const input = await migration(
+      "export async function up(ctx) { await ctx.db.schema.createTable('users').addColumn('id','text',c=>helper(c).primaryKey()).execute(); await ctx.db.schema.createIndex('empty').execute(); await ctx.db.schema.createIndex('dynamic').on('users').column(ctx.column).execute(); }",
+    )
+    expect(input.nodes.filter(({ kind }) => kind === 'primary-key' || kind === 'index')).toEqual([])
+    expect(input.gaps.map(({ message }) => message)).toEqual([
+      'Kysely modifier callback requires manual review.',
+      'Kysely schema definition requires manual review.',
+      'Dynamic Kysely index column cannot be analyzed.',
+    ])
+  })
+
+  test('keeps sequence-like literal defaults and user routines distinct from sequence calls', async () => {
+    const input = await migration(
+      "import { sql } from 'kysely'; export async function up(ctx) { await ctx.db.schema.createTable('users').addColumn('literal','text',c=>c.defaultTo('nextval(')).addColumn('quoted','text',c=>c.defaultTo(sql.raw(\"'nextval('\"))).addColumn('custom','text',c=>c.defaultTo(sql.raw('app.nextval()'))).addColumn('uppercase','text',c=>c.defaultTo(sql.raw('\"NEXTVAL\"()'))).addColumn('native','bigint',c=>c.defaultTo(sql.raw(\"pg_catalog.nextval('s')\"))).execute(); }",
+      'postgresql',
+    )
+    for (const name of ['literal', 'quoted', 'custom', 'uppercase'])
+      expect(node(input, 'column', name).sequential).toBe(false)
+    expect(node(input, 'column', 'native').sequential).toBe(true)
+    expect(input.gaps.map(({ identity }) => identity)).toEqual(['NEXTVAL'])
+  })
+
+  test('marks opaque CHECK and default evidence while retaining proven fields', async () => {
+    const input = await migration(
+      "export async function up(ctx) { await ctx.db.schema.createTable('users').addColumn('unknown','text',c=>{return c.defaultTo(ctx.value)}).addColumn('known','text',c=>c.defaultTo('ready').unknown()).addColumn('dynamic','text',c=>c.defaultTo(ctx.value)).addCheckConstraint(ctx.name,ctx.expression).execute(); }",
+    )
+    expect(node(input, 'table')).toMatchObject({ checksKnown: false, partial: true })
+    expect(node(input, 'column', 'unknown')).toMatchObject({ partial: true, nullable: undefined })
+    expect(Object.hasOwn(node(input, 'column', 'unknown'), 'default')).toBe(false)
+    expect(node(input, 'column', 'known')).toMatchObject({ partial: true, default: "'ready'" })
+    expect(node(input, 'column', 'dynamic').partial).toBe(true)
+    expect(input.nodes.filter(({ kind }) => kind === 'check')).toEqual([])
+    expect(input.gaps).toHaveLength(4)
+  })
+  test.each(['postgresql', 'mysql', 'sqlite'])(
+    'retains literal dotted %s index names and ordered column lists',
+    async (dialect) => {
+      const input = await migration(
+        "export async function up(ctx) { await ctx.db.schema.withSchema('app').createIndex('dot.index').on('records').column('one desc').columns(['two asc']).execute(); await ctx.db.schema.withSchema('app').dropIndex('dot.index').on('records').execute(); await ctx.db.schema.dropIndex('app.idx').on('records').execute(); }",
+        dialect,
+      )
+      expect(input.gaps).toEqual([])
+      const indexes = input.nodes.filter(({ kind }) => kind === 'index')
+      expect(indexes[0]).toMatchObject({
+        name: 'dot.index',
+        schema: 'app',
+        table: 'records',
+        identity: 'app.records."dot.index"',
+        columns: ['one', 'two'],
+      })
+      expect(indexes[1]).toMatchObject({
+        name: 'dot.index',
+        schema: 'app',
+        table: 'records',
+        identity: 'app.records."dot.index"',
+        action: 'drop',
+      })
+      expect(indexes[2]).toMatchObject({
+        name: 'app.idx',
+        identity: 'records."app.idx"',
+        action: 'drop',
+      })
+      const quote = dialect === 'mysql' ? String.fromCharCode(96) : '"'
+      const sql = await parseSqlLintInput(
+        'CREATE INDEX ' + quote + 'dot.index' + quote + ' ON records(one DESC,two ASC);',
+        dialect,
+        source,
+      )
+      expect(sql.gaps).toEqual([])
+      expect(node(sql, 'index')).toMatchObject({
+        name: indexes[0]!.name,
+        table: indexes[0]!.table,
+        columns: indexes[0]!.columns,
+      })
+    },
+  )
+
+  test('does not infer SQLite rowid or nullability through an opaque table suffix', async () => {
+    const input = await migration(
+      "import { sql } from 'kysely'; export async function up(ctx) { await ctx.db.schema.createTable('records').addColumn('id','integer',c=>c.primaryKey()).modifyEnd(sql.raw('without rowid')).execute(); await ctx.db.schema.createTable('explicit').addColumn('id','integer',c=>c.primaryKey().autoIncrement().notNull()).unknown().execute(); }",
+    )
+    const inferred = input.nodes.find(
+      ({ kind, table }) => kind === 'column' && table === 'records',
+    )!
+    const explicit = input.nodes.find(
+      ({ kind, table }) => kind === 'column' && table === 'explicit',
+    )!
+    expect(inferred.sequential).toBeUndefined()
+    expect(inferred.nullable).toBeUndefined()
+    expect(explicit).toMatchObject({ sequential: true, nullable: false })
+    expect(input.gaps).toHaveLength(2)
+  })
+
+  test('handles tagged default expressions and foreign-key modifier callbacks directly', async () => {
+    const input = await migration(
+      "import { sql } from 'kysely'; export async function up(ctx) { await ctx.db.schema.createTable('records').addColumn('id','bigint',c=>c.defaultTo(sql.raw('pg_catalog.nextval(1)'))).addColumn('status','text',c=>c.defaultTo(sql\x60'ready'\x60)).addForeignKeyConstraint('fk',['id'],'parents',['id'],c=>c.onDelete('cascade').onUpdate('restrict')).addForeignKeyConstraint('opaque_fk',['id'],'parents',['id'],c=>c.unknown()).execute(); }",
+      'postgresql',
+    )
+    expect(node(input, 'column', 'id').sequential).toBe(true)
+    expect(node(input, 'column', 'status').default).toBe("'ready'")
+    expect(input.nodes.filter(({ kind }) => kind === 'foreign-key')).toHaveLength(2)
+    expect(input.gaps.map(({ message }) => message)).toEqual([
+      'Kysely foreign key modifier requires manual review.',
+    ])
+    const path = join(directory, 'unknown-expression.ts')
+    await Bun.write(
+      path,
+      "import {sql} from 'kysely'; export async function up(ctx) { await ctx.db.schema.createTable('records').addColumn('value','text',c=>c.defaultTo(sql.raw('app.value()'))).execute() }",
+    )
+    const portable = await readMigrationLintInputs(path, undefined, ['up'])
+    expect(portable.gaps.map(({ message }) => message)).toEqual([
+      'SQL expression analysis requires a supported dialect.',
+    ])
   })
 })

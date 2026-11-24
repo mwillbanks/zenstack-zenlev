@@ -19,6 +19,17 @@ test('required columns check type, nullability, default, and state after a drop'
   expect(inspect('columns/required', [node('schema', 'app')], config).reports).toHaveLength(0)
 })
 
+test('column alterations distinguish an unchanged default from a dropped default', () => {
+  const config = { columns: { id: { default: '1' } } }
+  const catalog = { ...id, default: '1', origin: 'catalog' as const }
+  const alter = { ...id, action: 'alter' as const, nullable: true }
+  const clear = { ...alter, default: undefined }
+  expect(inspect('columns/required', [table, catalog, alter], config, [alter]).reports).toEqual([])
+  const { reports } = inspect('columns/required', [table, catalog, alter, clear], config, [clear])
+  expect(reports).toHaveLength(1)
+  expect(reports[0]?.anchor).toBe(clear)
+})
+
 test('column conventions use explicit types and selectors for business semantics', () => {
   const boolean = node('column', 'active', { table: 'orders', type: 'boolean' })
   expect(
@@ -54,4 +65,11 @@ test('column conventions report evidence gaps for unknown type and nullability',
   expect(required.reports).toHaveLength(0)
   expect(required.gaps).toHaveLength(2)
   expect(inspect('columns/conventions', [partial], { allowedTypes: ['uuid'] }).gaps).toHaveLength(1)
+  const incomplete = { ...id, partial: true }
+  const config = { columns: { id: { default: '1' } } }
+  const missingEvidence = inspect('columns/required', [table, incomplete], config)
+  expect(missingEvidence.reports).toEqual([])
+  expect(missingEvidence.gaps).toEqual(['Column default is unavailable.'])
+  const knownAbsent = { ...incomplete, default: undefined }
+  expect(inspect('columns/required', [table, knownAbsent], config).reports).toHaveLength(1)
 })

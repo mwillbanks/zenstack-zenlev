@@ -99,7 +99,7 @@ The CLI also runs as `zenstack-zenlev`. Add `--json` for automation. [First migr
 bun run zenlev lint --max-warnings 0
 ```
 
-Zenlev applies its recommended naming and primary-key rules. Configure project conventions under `lint`. Install the optional parser peer for each SQL dialect you lint: `libpg-query@18` for PostgreSQL, `dt-sql-parser@4` for MySQL, or `sqlite3-parser@0.7` for SQLite. Register `plugins: [lintPlugin()]` to enforce lint during apply and schema push. [Lint configuration and plugins](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/linting)
+Zenlev applies its recommended naming and primary-key rules. Configure project conventions under `lint`. Install the optional parser peer for each SQL dialect whose authored SQL files or raw migration SQL you lint: `libpg-query@18` for PostgreSQL, `dt-sql-parser@4` for MySQL, or `sqlite3-parser@0.7` for SQLite. Supported Kysely builders and generated schema push evidence use structured linting without a SQL parser peer. Register `plugins: [lintPlugin()]` to enforce lint during apply and schema push. [Lint configuration and plugins](https://mwillbanks.github.io/zenstack-zenlev/docs/guides/linting)
 
 ### 5. Install agent guidance
 

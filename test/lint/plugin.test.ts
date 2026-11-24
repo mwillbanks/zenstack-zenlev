@@ -1,10 +1,12 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, beforeEach, expect, mock, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { Kysely } from 'kysely'
 import { createKyselyAdapter, createZenlev, definePlugin, lintPlugin } from '../../src'
 import { authorMigration } from '../../src/migrate/files'
+import type { PluginApi, WriteProject } from '../../src/plugins'
 import { createBunSqliteDialect } from '../fixtures/sqlite'
 
 let cwd: string
@@ -377,3 +379,231 @@ test('write lint forgets indexes removed by an earlier table drop', async () => 
     await zenlev.close()
   }
 })
+
+test('schema push supplies ordered facts and anchors diagnostics to generated statements', async () => {
+  await write('schema.zmodel', datasource + 'model Item { id String @id @@map("BadTable") }')
+  const seen: { statements: readonly string[]; count: number }[] = []
+  const sources: unknown[] = []
+  const observe = definePlugin({
+    name: 'observe-structured-write',
+    setup(api) {
+      api.onBeforeWrite((_context, plan) => {
+        if (plan.command !== 'db push') return
+        expect(plan.evidence).toHaveLength(plan.statements.length)
+        expect(plan.evidence?.every((input) => input.nodes.length && !input.gaps.length)).toBe(true)
+        seen.push({ statements: plan.statements, count: plan.evidence!.length })
+      })
+    },
+  })
+  const config = {
+    cwd,
+    adapter: createKyselyAdapter(db, 'sqlite'),
+    plugins: [observe, lintPlugin()],
+    lint: {
+      zmodel: false as const,
+      catalog: { dialect: 'sqlite' as const, read: () => ({ nodes: [], gaps: [] }) },
+      plugins: [
+        {
+          meta: { name: 'capture' },
+          rules: {
+            source: {
+              meta: { messages: {} },
+              create: () => ({
+                table(node: import('../../src/lint/types').LintNode) {
+                  sources.push(node.source)
+                },
+              }),
+            },
+          },
+        },
+      ],
+      rules: { 'capture/source': 'error' as const },
+    },
+  }
+  const service = await createZenlev(config)
+  try {
+    const preview = await service.db.push({ sql: true })
+    expect((await service.db.push({ dryRun: true })).status).toBe('planned')
+    expect((await service.db.push({ createMigration: true, format: false })).status).toBe('created')
+    expect(seen).toEqual([])
+    const result = await service.db.push()
+    expect(result.status).toBe('blocked')
+    expect(seen[0]?.statements).toEqual(
+      preview.changes.operations.flatMap((operation) =>
+        operation.up.map((statement) => statement.sql),
+      ),
+    )
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        ruleId: 'zenlev/naming/table-case',
+        source: expect.objectContaining({ path: '<db push>', line: 1, column: 1 }),
+      }),
+    ])
+    expect(sources).toEqual([
+      expect.objectContaining({
+        path: '<db push>',
+        line: 1,
+        column: 1,
+        fingerprint: expect.any(String),
+      }),
+    ])
+    expect(sqlite.query("SELECT name FROM sqlite_schema WHERE name='BadTable'").all()).toEqual([])
+  } finally {
+    await service.close()
+  }
+  const warningService = await createZenlev({
+    ...config,
+    lint: {
+      ...config.lint,
+      rules: { 'capture/source': 'error', 'zenlev/naming/table-case': 'warn' },
+    },
+  })
+  try {
+    const result = await warningService.db.push()
+    expect(result.status).toBe('applied')
+    expect(result.diagnostics).toEqual([expect.objectContaining({ severity: 'warn' })])
+  } finally {
+    await warningService.close()
+  }
+})
+
+test('lint hook validates optional evidence and supports SQL-only snapshots', async () => {
+  let inspect: Parameters<PluginApi['onBeforeWrite']>[0] | undefined
+  await lintPlugin().setup({
+    onBeforeWrite(hook) {
+      inspect = hook
+    },
+  } as PluginApi)
+  const adapter = createKyselyAdapter(db, 'sqlite')
+  const project = {
+    adapter,
+    config: {
+      cwd,
+      lint: {
+        zmodel: false,
+        catalog: { dialect: 'sqlite', read: () => ({ nodes: [], gaps: [] }) },
+      },
+    },
+  } as WriteProject
+  const plan = {
+    command: 'db push',
+    statements: ['CREATE TABLE "BadTable" ("id" TEXT PRIMARY KEY)'],
+    desired: {
+      dialect: 'sqlite',
+      sourcePath: 'schema.zmodel',
+      namespaces: [],
+      tables: [],
+      enums: [],
+      unsupported: [],
+      warnings: [],
+    },
+    affected: [],
+  } as const
+  await expect(inspect!({} as never, { ...plan, evidence: [] }, project)).rejects.toThrow(
+    'does not match',
+  )
+  expect(await inspect!({} as never, plan, project)).toContainEqual(
+    expect.objectContaining({ ruleId: 'zenlev/naming/table-case', severity: 'error' }),
+  )
+})
+
+test.each(['sqlite', 'mysql'] as const)(
+  '%s preserves statement coverage anchors and filters ZModel gaps to affected objects',
+  async (dialect) => {
+    let inspect: Parameters<PluginApi['onBeforeWrite']>[0] | undefined
+    await lintPlugin().setup({
+      onBeforeWrite(hook) {
+        inspect = hook
+      },
+    } as PluginApi)
+    const adapter = createKyselyAdapter(db, dialect)
+    const qualified = dialect === 'mysql' ? 'app.items' : 'items'
+    const project = {
+      adapter,
+      config: {
+        cwd,
+        lint: { catalog: { dialect, read: () => ({ nodes: [], gaps: [] }) } },
+      },
+    } as WriteProject
+    const statements = ['CREATE TABLE items (id TEXT)', 'ALTER TABLE items ADD COLUMN value TEXT']
+    const result = await inspect!(
+      {} as never,
+      {
+        command: 'db push',
+        statements,
+        evidence: [
+          { nodes: [], gaps: [] },
+          {
+            nodes: [],
+            gaps: [
+              {
+                message: 'Generated expression requires review.',
+                identity: qualified,
+                source: { path: 'discarded.sql', line: 99, column: 7 },
+              },
+            ],
+          },
+        ],
+        desired: {
+          dialect,
+          sourcePath: 'schema.zmodel',
+          namespaces: [],
+          enums: [],
+          unsupported: [],
+          warnings: [],
+          tables: [
+            {
+              name: 'items',
+              ...(dialect === 'mysql' ? { namespace: 'app' } : {}),
+              model: 'Item',
+              isView: false,
+              columns: [],
+              primaryKey: [],
+              foreignKeys: [],
+              indexes: [],
+            },
+          ],
+        },
+        affected: [qualified],
+        zmodel: {
+          nodes: [
+            { kind: 'table', name: 'items', table: 'items', origin: 'zmodel' },
+            { kind: 'table', name: 'BadTable', table: 'unaffected', origin: 'zmodel' },
+            { kind: 'schema', name: 'unattached', origin: 'zmodel' },
+          ],
+          gaps: [
+            { message: 'Qualified schema evidence requires review.', identity: qualified },
+            { message: 'Unqualified schema evidence requires review.', identity: 'items' },
+            { message: 'Unrelated schema evidence requires review.', identity: 'unaffected' },
+            { message: 'Unidentified schema evidence requires review.' },
+          ],
+        },
+      },
+      project,
+    )
+    expect(result).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ruleId: 'zenlev/coverage',
+          severity: 'warn',
+          message: 'Generated expression requires review.',
+          source: {
+            path: '<db push>',
+            line: 2,
+            column: 1,
+            fingerprint: createHash('sha256').update(statements[1]!).digest('hex'),
+          },
+        }),
+        expect.objectContaining({
+          ruleId: 'zenlev/coverage',
+          message: 'Qualified schema evidence requires review.',
+        }),
+        expect.objectContaining({
+          ruleId: 'zenlev/coverage',
+          message: 'Unqualified schema evidence requires review.',
+        }),
+      ]),
+    )
+    expect(result).toHaveLength(3)
+  },
+)

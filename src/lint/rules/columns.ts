@@ -47,8 +47,11 @@ const requiredColumns = defineTableRule(
               'Set ' + name + ' nullability to ' + String(required.nullable) + '.',
             )
         }
-        if (required.default !== undefined && column.default !== required.default)
-          report(context, column, 'Use the configured default for ' + name + '.')
+        if (required.default !== undefined && column.default !== required.default) {
+          if (column.partial && !Object.hasOwn(column, 'default'))
+            context.gap('Column default is unavailable.', column)
+          else report(context, column, 'Use the configured default for ' + name + '.')
+        }
       }
     },
   }),

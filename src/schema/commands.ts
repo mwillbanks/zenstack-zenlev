@@ -7,6 +7,7 @@ import { prepareAuthoring, type CreateOptions } from '../migrate/inspection'
 import { authorMigration, type AuthorMigrationInput } from '../migrate/files'
 import { alignCatalogSchema, readCatalog } from './catalog'
 import { buildChangeSet, type SchemaChangeSet, type SqlStatement } from './diff'
+import { readStatementEvidence } from './diff/evidence'
 import { loadResolvedZModel, loadSchemaModel, projectResolvedZModel } from './model'
 import { createStore } from '../migrate/store'
 import type { MigrationIdentity } from '../types'
@@ -183,6 +184,7 @@ export async function push(context: CommandContext, options: PushOptions): Promi
       {
         command: 'db push',
         statements: statements.map(({ sql }) => sql),
+        evidence: changes.operations.flatMap(readStatementEvidence),
         desired: current.target,
         affected: [...affected],
         ...(context.plugins.hasBeforeWrite && context.config.lint?.zmodel !== false

@@ -43,7 +43,7 @@ For agent-assisted plugin authoring, allow and load `@mwillbanks/zenstack-zenlev
 
 Register `api.onBeforeWrite((context, plan, project) => diagnostics)` for policy that must inspect the final write plan. Return `WriteDiagnostic[]` with `ruleId`, `severity`, and `message`, plus optional source, identity, and fingerprint evidence. An `error` diagnostic rejects the plan. A `warn` diagnostic accompanies the result.
 
-`WritePlan` discriminates `migrate apply` from `db push`. Apply supplies exact migration identities, hashes, and handler directions. The snapshot omits arbitrary migration `custom` metadata. Push supplies ordered statements, affected table identities, and desired schema definitions. `WriteProject` supplies resolved project inputs and the existing adapter.
+`WritePlan` discriminates `migrate apply` from `db push`. Apply supplies exact migration identities, hashes, and handler directions. The snapshot omits arbitrary migration `custom` metadata. Push supplies ordered statements, affected table identities, and desired schema definitions. Its optional `evidence` array aligns with the statements by index and contains structured lint facts for each generated statement. Hooks can inspect that evidence without parsing generated SQL. `WriteProject` supplies resolved project inputs and the existing adapter.
 
 This hook runs under the lock after plan transformations and validation. It precedes baseline accommodation, attempt records, migration handlers, and push SQL. Preview and file-generation commands skip it. Hooks receive a plan copy. The existing lock path can initialize the internal ledger before a veto.
 

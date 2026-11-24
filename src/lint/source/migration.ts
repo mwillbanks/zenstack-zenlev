@@ -56,7 +56,7 @@ export async function readMigrationLintInputs(
   const nodes: LintNode[] = []
   const gaps: LintGap[] = []
   const sqlAliases = new Set<string>()
-  const queries: { sql: string; source: LintSource; portable?: boolean; anchor?: boolean }[] = []
+  const operations: (LintInput | { sql: string; source: LintSource; anchor?: boolean })[] = []
   const location = (node: Node) =>
     sourceAt({ path, line: 1, column: 1, fingerprint }, text, node.start, node.end)
   const literalQuery = (sql: string, node: Node) => {
@@ -64,7 +64,7 @@ export async function readMigrationLintInputs(
     const source = exact
       ? sourceAt({ path, line: 1, column: 1, fingerprint }, text, node.start + 1, node.end - 1)
       : location(node)
-    queries.push({ sql, source, anchor: !exact })
+    operations.push({ sql, source, anchor: !exact })
   }
   const children = (node: Node, callback: (child: Node) => void) => {
     const fields = node as unknown as Record<string, Node | Node[] | null>
@@ -101,8 +101,8 @@ export async function readMigrationLintInputs(
     node.callee.type === 'MemberExpression' &&
     memberName(node.callee) === 'raw' &&
     isSql(node.callee.object)
-  const builder = readKyselyBuilder(dialect, isSql, gap, (sql, expression) => {
-    queries.push({ sql, source: location(expression), portable: true, anchor: true })
+  const builder = readKyselyBuilder(dialect, isSql, gap, location, (input) => {
+    operations.push(input)
   })
   function visit(node: Node): void {
     if (node.type === 'TaggedTemplateExpression' && isSql(node.tag)) {
@@ -132,7 +132,7 @@ export async function readMigrationLintInputs(
           sql += (fragment ?? 'NULL') + (node.quasi.quasis[index + 1]?.value.cooked ?? '')
         }
         if (dynamic) gap(node, 'Dynamic SQL structure cannot be analyzed.')
-        else queries.push({ sql, source: location(node), anchor: true })
+        else operations.push({ sql, source: location(node), anchor: true })
       }
       return
     }
@@ -225,12 +225,13 @@ export async function readMigrationLintInputs(
     )
       gap(statement, 'Re-exported migration handlers require manual review.')
   }
-  for (const query of queries) {
-    const input = await parseSqlLintInput(
-      query.sql,
-      dialect ?? (query.portable ? 'postgresql' : undefined),
-      query.source,
-    )
+  for (const query of operations) {
+    if (!('sql' in query)) {
+      nodes.push(...query.nodes)
+      gaps.push(...query.gaps)
+      continue
+    }
+    const input = await parseSqlLintInput(query.sql, dialect, query.source)
     nodes.push(
       ...input.nodes.map((node) => ({
         ...node,

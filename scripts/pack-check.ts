@@ -33,6 +33,8 @@ const manifest = (await Bun.file(resolve(root, 'package.json')).json()) as {
   name: string
   version: string
   devDependencies: Record<string, string>
+  peerDependencies: Record<string, string>
+  peerDependenciesMeta: Record<string, { optional?: boolean }>
 }
 assert.equal(manifest.name, '@mwillbanks/zenstack-zenlev')
 assert(
@@ -352,7 +354,10 @@ assert(result.diagnostics.some(({ ruleId }) => ruleId === 'zenlev/naming/table-c
     }
     assert.equal(outputs[0], outputs[1])
   }
-  const optionalConsumer = resolve(temporary, 'without-optional-dependencies')
+  const optionalConsumer = resolve(temporary, 'without-optional-peers')
+  const requiredPeers = Object.entries(manifest.peerDependencies)
+    .filter(([name]) => !manifest.peerDependenciesMeta[name]?.optional)
+    .map(([name, range]) => [name, manifest.devDependencies[name] ?? range])
   await mkdir(optionalConsumer)
   await Bun.write(
     resolve(optionalConsumer, 'package.json'),
@@ -361,11 +366,29 @@ assert(result.diagnostics.some(({ ruleId }) => ruleId === 'zenlev/naming/table-c
       private: true,
       dependencies: {
         [manifest.name]: 'file:' + archivePath,
-        kysely: manifest.devDependencies.kysely,
+        ...Object.fromEntries(requiredPeers),
       },
     }),
   )
-  await run([process.execPath, 'install', '--ignore-scripts', '--omit=optional'], optionalConsumer)
+  await run([process.execPath, 'install', '--ignore-scripts', '--omit=peer'], optionalConsumer)
+  const migrationPath = 'migrations/a12345678901234567890123_create_items.ts'
+  await mkdir(resolve(optionalConsumer, 'migrations'))
+  await Bun.write(resolve(optionalConsumer, migrationPath), fixtureSources[migrationPath])
+  await Bun.write(
+    resolve(optionalConsumer, 'lint-consumer.ts'),
+    `import assert from 'node:assert/strict'
+import { lintProject } from '@mwillbanks/zenstack-zenlev'
+for (const dialect of ['sqlite', 'postgresql', 'mysql'] as const) {
+  const result = await lintProject({ cwd: import.meta.dir, lint: { zmodel: false, dialect } })
+  assert.equal(result.status, 'failed')
+  assert.deepEqual(result.coverage.gaps, [])
+  const table = result.diagnostics.find(({ ruleId }) => ruleId === 'zenlev/naming/table-case')
+  assert.equal(table?.identity, 'Item')
+  assert.equal(table?.source?.path, '${migrationPath}')
+}
+`,
+  )
+  await run([process.execPath, 'lint-consumer.ts'], optionalConsumer)
   await copyFile(resolve(consumer, 'lint.sql'), resolve(optionalConsumer, 'lint.sql'))
   for (const [dialect, parser] of Object.entries(sqlParsers)) {
     await Bun.write(

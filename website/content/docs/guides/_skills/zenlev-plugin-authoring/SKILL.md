@@ -15,6 +15,8 @@ metadata:
     src/migrate/execution.ts
     src/plugins.ts
     src/lint/plugin.ts
+    src/schema/diff.ts
+    src/schema/diff/evidence.ts
     src/lint/runner.ts
     src/lint/types.ts
     src/types.ts
@@ -49,7 +51,7 @@ Register the exported plugin with your existing client or adapter. The sample ob
 ## Preserve execution rules
 
 - Before hooks may return `false` to abort their operation. Command and plan hooks can run for previews. Keep them free of writes and external effects.
-- An `onBeforeWrite` hook receives the final locked plan after transformations. Return structured error diagnostics to veto the entire write plan. Warning diagnostics accompany the result. Preview and file-generation commands skip this hook. The lock path can initialize the ledger before a veto.
+- An `onBeforeWrite` hook receives the final locked plan after transformations. Return structured error diagnostics to veto the entire write plan. Warning diagnostics accompany the result. For `db push`, optional `evidence` entries align by index with the ordered generated statements and expose structured lint facts. Preview and file-generation commands skip this hook. The lock path can initialize the ledger before a veto.
 - An `onPlan` hook receives a copy. Return a valid replacement to narrow eligible work. Keep prerequisites, migration identities, transaction mode, and warnings intact. Declare prerequisites in migration metadata.
 - Command context may have no database. Before-migration hooks receive the execution context. After-migration hooks observe the result using a root context. Put changes that must commit with the migration in its handler.
 - Observer errors can be reported after a commit. Inspect the command result and run `bun run zenlev migrate status --env staging --json` with the original environment. If the ledger shows the migration applied, reconcile the missing audit event separately. Never place credentials, SQL parameters, or user data in telemetry attributes.

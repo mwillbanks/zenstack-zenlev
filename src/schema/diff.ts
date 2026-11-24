@@ -31,6 +31,8 @@ import {
   foreignTarget,
   indexName,
 } from './diff/sql'
+import { recordStatementEvidence, schemaEvidence } from './diff/evidence'
+import type { LintNode } from '../lint/types'
 
 export interface SqlStatement {
   readonly sql: string
@@ -92,6 +94,7 @@ export function buildChangeSet(
   const configureColumn = (column: SchemaColumn, inline: boolean) =>
     renderColumn(column, inline, dialect)
   const operations: SchemaOperation[] = []
+  const facts = schemaEvidence(dialect, to.enums, db)
   const blockers: SchemaBlocker[] = [...from.unsupported, ...to.unsupported].map(
     ({ code, message }) => ({
       code,
@@ -121,14 +124,15 @@ export function buildChangeSet(
     down?: readonly SqlStatement[],
     warnings: readonly Warning[] = [],
   ) => {
-    operations.push({
+    const operation: SchemaOperation = {
       id: kind + ':' + name,
       kind,
       table: name.split(':')[0]!,
       up,
       ...(down ? { down } : {}),
       warnings,
-    })
+    }
+    operations.push(operation)
   }
   const block = (code: string, message: string, table?: string, column?: string) => {
     blockers.push({
@@ -145,16 +149,27 @@ export function buildChangeSet(
       block('UNSUPPORTED_DDL', error instanceof Error ? error.message : String(error), table)
     }
   }
-  const compile = (query: { compile(executor: Kysely<any>): CompiledQuery }) =>
-    statement(query.compile(db))
+  const compile = (
+    query: { compile(executor: Kysely<any>): CompiledQuery },
+    nodes?: readonly LintNode[],
+  ) => {
+    const compiled = statement(query.compile(db))
+    return nodes ? recordStatementEvidence(compiled, nodes) : compiled
+  }
 
   const dropIndex = (table: SchemaTable, index: SchemaIndex): SqlStatement => {
     const name = indexName(table, index)
     if (dialect === 'postgresql' && index.constraint)
-      return compile(tableSchema(db, table).alterTable(table.name).dropConstraint(name))
+      return compile(
+        tableSchema(db, table).alterTable(table.name).dropConstraint(name),
+        facts.index(table, index, 'drop'),
+      )
     return dialect === 'mysql'
-      ? compile(tableSchema(db, table).alterTable(table.name).dropIndex(name))
-      : compile(tableSchema(db, table).dropIndex(name))
+      ? compile(
+          tableSchema(db, table).alterTable(table.name).dropIndex(name),
+          facts.index(table, index, 'drop'),
+        )
+      : compile(tableSchema(db, table).dropIndex(name), facts.index(table, index, 'drop'))
   }
   const createIndex = (table: SchemaTable, index: SchemaIndex): SqlStatement => {
     if (dialect === 'postgresql' && index.constraint)
@@ -162,21 +177,24 @@ export function buildChangeSet(
         tableSchema(db, table)
           .alterTable(table.name)
           .addUniqueConstraint(indexName(table, index), [...index.columns]),
+        facts.index(table, index, 'create'),
       )
     let builder = tableSchema(db, table)
       .createIndex(indexName(table, index))
       .on(table.name)
       .columns([...index.columns])
     if (index.unique) builder = builder.unique()
-    return compile(builder)
+    return compile(builder, facts.index(table, index, 'create'))
   }
   const dropForeign = (table: SchemaTable, fk: SchemaForeignKey) =>
     dialect === 'mysql'
       ? compile(
           sql`alter table ${qualified(table)} drop foreign key ${sql.id(foreignName(table, fk))}`,
+          facts.foreign(table, fk, 'drop'),
         )
       : compile(
           tableSchema(db, table).alterTable(table.name).dropConstraint(foreignName(table, fk)),
+          facts.foreign(table, fk, 'drop'),
         )
   const addForeign = (table: SchemaTable, fk: SchemaForeignKey): SqlStatement => {
     let builder = tableSchema(db, table)
@@ -186,7 +204,7 @@ export function buildChangeSet(
       ])
     if (fk.onDelete) builder = builder.onDelete(actions[fk.onDelete])
     if (fk.onUpdate) builder = builder.onUpdate(actions[fk.onUpdate])
-    return compile(builder)
+    return compile(builder, facts.foreign(table, fk, 'alter'))
   }
 
   for (const table of [...oldTables.values()].sort((a, b) => compare(key(a), key(b)))) {
@@ -225,7 +243,7 @@ export function buildChangeSet(
   if (dialect === 'postgresql') {
     for (const name of [...new Set(to.namespaces)].sort(compare)) {
       if (!from.namespaces.includes(name)) {
-        add('create-schema', name, [compile(db.schema.createSchema(name))])
+        add('create-schema', name, [compile(db.schema.createSchema(name), [facts.namespace(name)])])
       }
     }
   } else if (to.namespaces.some((namespace) => !from.namespaces.includes(namespace))) {
@@ -236,6 +254,7 @@ export function buildChangeSet(
   const enumSql = (item: SchemaEnum) =>
     compile(
       sql`create type ${qualified(item)} as enum (${sql.join(item.values.map((value) => sql.lit(value)))})`,
+      [facts.enum(item, 'create')],
     )
   if (dialect === 'postgresql') {
     for (const item of [...newEnums.values()].sort((a, b) => compare(key(a), key(b)))) {
@@ -315,7 +334,7 @@ export function buildChangeSet(
         add(
           'create-table',
           name,
-          [compile(builder)],
+          [compile(builder, facts.createTable(table))],
           [compile(tableSchema(db, table).dropTable(table.name))],
         )
         for (const index of table.indexes) {
@@ -420,7 +439,12 @@ export function buildChangeSet(
         add(
           'drop-column',
           name + ':' + column.name,
-          [compile(tableSchema(db, table).alterTable(table.name).dropColumn(column.name))],
+          [
+            compile(
+              tableSchema(db, table).alterTable(table.name).dropColumn(column.name),
+              facts.dropColumn(table, column.name),
+            ),
+          ],
           undefined,
           [warning('DROP_COLUMN', 'Dropping column ' + column.name + ' deletes its values', name)],
         )
@@ -452,6 +476,7 @@ export function buildChangeSet(
                 tableSchema(db, table)
                   .alterTable(table.name)
                   .addColumn(column.name, typeExpression(column), configureColumn(column, false)),
+                [facts.table(table, 'alter'), facts.column(table, column, 'alter')],
               ),
             ],
             [compile(tableSchema(db, table).alterTable(table.name).dropColumn(column.name))],
@@ -507,6 +532,7 @@ export function buildChangeSet(
                     typeExpression(column),
                     configureColumn(column, false),
                   ),
+                [facts.table(table, 'alter'), facts.column(table, column, 'alter')],
               ),
             ],
             undefined,
@@ -520,6 +546,9 @@ export function buildChangeSet(
                 tableSchema(db, table)
                   .alterTable(table.name)
                   .alterColumn(column.name, (alter) => alter.setDataType(typeExpression(column))),
+                facts.alterColumn(table, column.name, {
+                  type: facts.column(table, column, 'alter').type,
+                }),
               ),
             )
           if (changedDefault)
@@ -532,6 +561,9 @@ export function buildChangeSet(
                       ? alter.setDefault(defaultValue(column.default, dialect))
                       : alter.dropDefault(),
                   ),
+                facts.alterColumn(table, column.name, {
+                  default: facts.column(table, column, 'alter').default,
+                }),
               ),
             )
           if (changedNull)
@@ -542,6 +574,7 @@ export function buildChangeSet(
                   .alterColumn(column.name, (alter) =>
                     column.nullable ? alter.dropNotNull() : alter.setNotNull(),
                   ),
+                facts.alterColumn(table, column.name, { nullable: column.nullable }),
               ),
             )
           add('alter-column', name + ':' + column.name, up, undefined, warnings)
@@ -630,9 +663,13 @@ export function buildChangeSet(
         )
       }
     }
-    add('drop-table', name, [compile(tableSchema(db, table).dropTable(table.name))], undefined, [
-      warning('DROP_TABLE', 'Dropping table ' + name + ' deletes its data', name),
-    ])
+    add(
+      'drop-table',
+      name,
+      [compile(tableSchema(db, table).dropTable(table.name), [facts.table(table, 'drop')])],
+      undefined,
+      [warning('DROP_TABLE', 'Dropping table ' + name + ' deletes its data', name)],
+    )
   }
   if (dialect === 'postgresql') {
     for (const item of oldEnums.values()) {
@@ -645,7 +682,10 @@ export function buildChangeSet(
         ].some((table) => table.columns.some((column) => enumKey(column) === key(item)))
         if (retained)
           block('ENUM_DEPENDENCY', 'A preserved table still uses the removed enum', key(item))
-        else add('drop-enum', key(item), [compile(sql`drop type ${qualified(item)}`)])
+        else
+          add('drop-enum', key(item), [
+            compile(sql`drop type ${qualified(item)}`, [facts.enum(item, 'drop')]),
+          ])
       }
     }
   }

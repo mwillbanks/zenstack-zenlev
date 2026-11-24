@@ -88,7 +88,10 @@ function activeNodes(context: LintRuleContext): readonly LintNode[] {
           ? {
               ...previous,
               ...Object.fromEntries(
-                Object.entries(node).filter(([, value]) => value !== undefined),
+                Object.entries(node).filter(
+                  ([property, value]) =>
+                    value !== undefined || (node.kind === 'column' && property === 'default'),
+                ),
               ),
             }
           : node,
