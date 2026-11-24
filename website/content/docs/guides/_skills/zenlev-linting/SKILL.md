@@ -31,7 +31,6 @@ metadata:
     src/schema/diff.ts
     src/schema/diff/evidence.ts
     src/schema/commands.ts
-    package.json
 ---
 
 # Lint database changes
