@@ -21,6 +21,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 
 ### Fixed
 
+- Package versioned agent skills without requiring a separate source review record.
 - Preserve constraint, index, and policy identities when checking planned changes against the database catalog.
 - Track foreign-key index coverage after index drops in offline lint and write plans.
 - Report class, member, and legacy parameter decorators that can run during migration import.

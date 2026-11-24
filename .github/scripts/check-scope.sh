@@ -30,19 +30,14 @@ if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/
   exit 0
 fi
 
-skill_sources=$(jq -r 'to_entries[].value.files | keys[]' skills-review.json)
-
 # Disable rename detection so both the old and new path select their checks.
 git diff --no-renames --name-only -z "$base" "$head" -- | {
   while IFS= read -r -d '' file; do
-    if [[ $'\n'$skill_sources$'\n' == *$'\n'"$file"$'\n'* ]]; then
-      skills=true
-    fi
     case "$file" in
       website/content/docs/guides/_skills/*/scripts/*)
         skills=true
         package=true ;;
-      website/content/docs/guides/_skills/*|skills-review.json)
+      website/content/docs/guides/_skills/*)
         skills=true ;;
       scripts/skills.ts|test/skills.test.ts|package.json|bun.lock|.gitignore)
         skills=true

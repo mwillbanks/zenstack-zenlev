@@ -55,8 +55,6 @@ When preparing a release, curate the shipped entries under the version heading. 
 
 ## Agent Skills
 
-Edit canonical skills under `website/content/docs/guides/_skills/`. List the supporting docs and implementation paths in `metadata.zenlev_sources`, one path per line. Use standard Agent Skills frontmatter. Keep optional Bun scripts in `scripts/`. Staging fingerprints and ships those scripts with the skill. For a new skill, update the consumer guide and pack inventory.
-
-After reviewing changed guidance or a declared source, run `bun run skills:review <skill> "<reason>"` and apply the resulting JSON to `skills-review.json`. Explain what you checked. Build and CI verify the record and stage skills with the package version.
+Edit canonical skills under `website/content/docs/guides/_skills/` and use standard Agent Skills frontmatter. Keep optional Bun scripts in `scripts/`. Build and CI validate the skills and stage them with the package version. For a new skill, update the consumer guide and pack inventory.
 
 Review the current worktree before editing. Preserve other contributors' changes. Never commit or publish unless the user explicitly requests it. Keep credentials, database files, generated build products, and coverage output out of Git.

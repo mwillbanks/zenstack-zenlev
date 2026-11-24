@@ -6,28 +6,6 @@ compatibility: Requires Bun and an installed Zenlev package.
 metadata:
   type: core
   library: '@mwillbanks/zenstack-zenlev'
-  zenlev_sources: |-
-    website/content/docs/guides/migrations.mdx
-    website/content/docs/guides/linting.mdx
-    website/content/docs/reference/lint-rules.mdx
-    website/content/docs/reference/commands.mdx
-    src/migrate/files.ts
-    src/lint/project.ts
-    src/lint/source/migration.ts
-    src/lint/source/sql.ts
-    src/lint/source/statement.ts
-    src/lint/source/query.ts
-    src/lint/source/tokens.ts
-    src/lint/source/kysely.ts
-    src/lint/source/kysely/ast.ts
-    src/lint/source/kysely/context.ts
-    src/lint/source/kysely/table.ts
-    src/schema/diff.ts
-    src/schema/diff/evidence.ts
-    src/lint/zmodel.ts
-    src/database.ts
-    src/migrate/execution.ts
-    src/types.ts
 ---
 
 # Author a migration with explicit prerequisites

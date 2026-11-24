@@ -121,8 +121,6 @@ bun pm ls
 
 Exact skill permissions freeze names, not instructions. Updating Zenlev can change an already allowed skill. Review dependency and lockfile changes, then compare the selected installed skill before relying on it. Intent does not currently record approval of specific instruction bytes or notify you about content changes.
 
-Zenlev's own CI checks declared source fingerprints and requires a recorded maintainer review when those sources change. That check protects package maintenance; consumers still decide whether to trust and apply the selected guidance.
-
 ## Understand the trust boundary
 
 Intent scans installed package files without importing dependency entry points, running their binaries, or invoking lifecycle scripts. Discovering a transitive dependency does not grant it permission: every source needs its own matching allowlist entry.
