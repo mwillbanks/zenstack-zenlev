@@ -6,13 +6,6 @@ compatibility: Requires Bun and an installed Zenlev package.
 metadata:
   type: core
   library: '@mwillbanks/zenstack-zenlev'
-  zenlev_sources: |-
-    website/content/docs/guides/rollback-recovery.mdx
-    website/content/docs/guides/baseline.mdx
-    website/content/docs/reference/commands.mdx
-    src/migrate/rollback.ts
-    src/migrate/store.ts
-    src/migrate/baseline.ts
 ---
 
 # Recover from observed database and ledger state

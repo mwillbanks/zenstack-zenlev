@@ -6,13 +6,6 @@ compatibility: Requires Bun and an installed Zenlev package.
 metadata:
   type: core
   library: '@mwillbanks/zenstack-zenlev'
-  zenlev_sources: |-
-    website/content/docs/guides/schema-changes.mdx
-    website/content/docs/reference/commands.mdx
-    src/schema/commands.ts
-    src/schema/catalog.ts
-    src/schema/diff.ts
-    src/schema/model.ts
 ---
 
 # Review the change set before execution

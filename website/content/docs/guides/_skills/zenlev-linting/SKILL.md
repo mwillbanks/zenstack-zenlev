@@ -6,31 +6,6 @@ compatibility: Requires Bun and an installed Zenlev package. SQL text analysis n
 metadata:
   type: core
   library: '@mwillbanks/zenstack-zenlev'
-  zenlev_sources: |-
-    README.md
-    website/content/docs/guides/linting.mdx
-    website/content/docs/reference/lint-rules.mdx
-    src/lint/project.ts
-    src/lint/plugin.ts
-    src/lint/rules.ts
-    src/lint/runner.ts
-    src/lint/source/migration.ts
-    src/lint/source/kysely.ts
-    src/lint/source/kysely/ast.ts
-    src/lint/source/kysely/context.ts
-    src/lint/source/kysely/table.ts
-    src/lint/source/sql.ts
-    src/lint/source/statement.ts
-    src/lint/source/definitions.ts
-    src/lint/source/query.ts
-    src/lint/source/tokens.ts
-    src/lint/sqlite/catalog.ts
-    src/lint/mysql/parser.ts
-    src/lint/postgresql/parser.ts
-    src/lint/sqlite/parser.ts
-    src/schema/diff.ts
-    src/schema/diff/evidence.ts
-    src/schema/commands.ts
 ---
 
 # Lint database changes

@@ -6,22 +6,6 @@ compatibility: Requires Bun and an installed Zenlev package.
 metadata:
   type: core
   library: '@mwillbanks/zenstack-zenlev'
-  zenlev_sources: |-
-    website/content/docs/reference/configuration.mdx
-    website/content/docs/reference/api.mdx
-    website/content/docs/guides/namespaces.mdx
-    website/content/docs/guides/linting.mdx
-    src/database.ts
-    src/config.ts
-    src/lint/source/kysely.ts
-    src/lint/source/sql.ts
-    src/lint/plugin.ts
-    src/lint/sqlite/catalog.ts
-    src/lint/mysql/parser.ts
-    src/lint/postgresql/parser.ts
-    src/lint/sqlite/parser.ts
-    src/schema/diff/evidence.ts
-    src/types.ts
 ---
 
 # Set up the configured destination

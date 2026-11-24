@@ -6,12 +6,6 @@ compatibility: Requires Bun and an installed Zenlev package.
 metadata:
   type: core
   library: '@mwillbanks/zenstack-zenlev'
-  zenlev_sources: |-
-    website/content/docs/guides/deployments.mdx
-    website/content/docs/guides/namespaces.mdx
-    website/content/docs/guides/graph.mdx
-    src/migrate/graph.ts
-    src/migrate/execution.ts
 ---
 
 # Plan stages through dependencies

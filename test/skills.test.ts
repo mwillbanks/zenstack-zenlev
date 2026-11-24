@@ -2,15 +2,11 @@ import { expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { prepareSkills, recordReview, reviewPath, skillDirectory } from '../scripts/skills'
+import { prepareSkills, skillDirectory } from '../scripts/skills'
 
-test('stages reviewed skills at the package version and detects source drift', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'zenlev-skill-review-'))
+test('stages valid skills and bundled scripts at the package version', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'zenlev-skills-'))
   const skill = join(root, skillDirectory, 'zenlev-example')
-  const writeReview = async (reason: string) => {
-    const review = await recordReview(root, 'zenlev-example', reason)
-    await Bun.write(join(root, reviewPath), JSON.stringify(review))
-  }
 
   try {
     await mkdir(join(skill, 'scripts'), { recursive: true })
@@ -25,15 +21,12 @@ test('stages reviewed skills at the package version and detects source drift', a
         'description: Use when checking the fixture.',
         'metadata:',
         '  library: "@mwillbanks/zenstack-zenlev"',
-        '  zenlev_sources: |',
-        '    guide.md',
         '  type: core',
         '---',
         '# Example',
         '',
       ].join('\n'),
     )
-    await Bun.write(join(root, 'guide.md'), '# Guide\n')
     await Bun.write(join(root, 'package.json'), '{"version":"1.2.3"}')
 
     const valid = await Bun.file(markdown).text()
@@ -43,60 +36,17 @@ test('stages reviewed skills at the package version and detects source drift', a
         'unsupported Agent Skills frontmatter',
       ],
       [valid.replace('description: Use when checking the fixture.\n', ''), 'needs a description'],
-      [
-        valid.replace('zenlev_sources: |\n    guide.md', 'zenlev_sources: [guide.md]'),
-        'string-valued metadata',
-      ],
-      [valid.replace('guide.md', ''), 'one non-empty path per line'],
-      [valid.replace('guide.md', 'guide.md\n\n    guide.md'), 'one non-empty path per line'],
+      [valid.replace('  type: core', '  type: [core]'), 'string-valued metadata'],
     ] as const) {
       await Bun.write(markdown, invalid)
       await expect(prepareSkills(root)).rejects.toThrow(message)
     }
     await Bun.write(markdown, valid)
-    await expect(prepareSkills(root)).rejects.toThrow('no recorded review')
-    const review = await recordReview(
-      root,
-      'zenlev-example',
-      'Checked the skill against the guide.',
-    )
-    expect(Object.keys(review['zenlev-example']!.files)).toEqual([
-      'guide.md',
-      skillDirectory + '/zenlev-example/SKILL.md',
-      skillDirectory + '/zenlev-example/scripts/example.ts',
-    ])
-    await Bun.write(join(root, reviewPath), JSON.stringify(review))
     await prepareSkills(root)
     const staged = Bun.file(join(root, 'skills/zenlev-example/SKILL.md'))
     expect(await staged.text()).toContain('library_version: "1.2.3"')
     expect(await Bun.file(join(root, 'skills/zenlev-example/scripts/example.ts')).text()).toBe(
       'console.log(1)\n',
-    )
-
-    await Bun.write(script, 'console.log(2)\n')
-    await expect(prepareSkills(root)).rejects.toThrow(
-      'review ' + skillDirectory + '/zenlev-example/scripts/example.ts',
-    )
-    await writeReview('Checked the updated script output.')
-    await prepareSkills(root)
-
-    await Bun.write(join(root, 'unrelated.md'), '# Unrelated\n')
-    await Bun.write(join(root, 'package.json'), '{"version":"1.2.4"}')
-    await prepareSkills(root)
-    expect(await staged.text()).toContain('library_version: "1.2.4"')
-
-    await Bun.write(join(root, 'guide.md'), '# Edited guide\n')
-    await expect(prepareSkills(root)).rejects.toThrow('zenlev-example: review guide.md')
-    expect(await staged.text()).toContain('library_version: "1.2.4"')
-    await writeReview('The heading changed. The instructions still apply.')
-    await prepareSkills(root)
-
-    await rm(join(root, 'guide.md'))
-    await expect(prepareSkills(root)).rejects.toThrow(
-      'zenlev-example: Missing skill source: guide.md',
-    )
-    await expect(recordReview(root, 'zenlev-example', 'Unsourced')).rejects.toThrow(
-      'Missing skill source',
     )
   } finally {
     await rm(root, { recursive: true, force: true })

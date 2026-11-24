@@ -49,7 +49,6 @@
     "test:coverage": "bun test --coverage --bail --coverage-reporter=text --coverage-reporter=lcov && bun scripts/check-coverage.ts",
     "skills:prepare": "bun scripts/skills.ts",
     "skills:check": "bun run skills:prepare && intent validate --check",
-    "skills:review": "bun scripts/skills.ts review",
     "build": "bun run skills:prepare && bun scripts/build.ts",
     "pack:check": "bun scripts/pack-check.ts",
     "prepack": "bun run build"

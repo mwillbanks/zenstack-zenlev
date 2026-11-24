@@ -6,20 +6,6 @@ compatibility: Requires Bun and an installed Zenlev package.
 metadata:
   type: core
   library: '@mwillbanks/zenstack-zenlev'
-  zenlev_sources: |-
-    website/content/docs/reference/plugins-telemetry.mdx
-    website/content/docs/guides/linting.mdx
-    website/content/docs/reference/lint-rules.mdx
-    website/content/docs/reference/api.mdx
-    src/engine.ts
-    src/migrate/execution.ts
-    src/plugins.ts
-    src/lint/plugin.ts
-    src/schema/diff.ts
-    src/schema/diff/evidence.ts
-    src/lint/runner.ts
-    src/lint/types.ts
-    src/types.ts
 ---
 
 # Author a Zenlev lifecycle plugin
