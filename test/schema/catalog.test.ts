@@ -162,6 +162,24 @@ test.each([
   ['-0x2a', -42],
   ['(0x2a)', 42],
   ['0xffffffffffffffff', -1],
+  ['0x1fffffffffffff', Number.MAX_SAFE_INTEGER],
+  ['-0x1fffffffffffff', Number.MIN_SAFE_INTEGER],
+  ['0xffe0000000000001', Number.MIN_SAFE_INTEGER],
+  ['-0xffe0000000000001', Number.MAX_SAFE_INTEGER],
 ] as const)('normalizes SQLite hexadecimal default %s', (source, value) => {
   expect(literalDefault(source)).toEqual({ kind: 'literal', value })
+})
+
+test.each([
+  '0x20000000000000',
+  '0x20000000000001',
+  '-0x20000000000000',
+  '-0x20000000000001',
+  '0x7fffffffffffffff',
+  '0x8000000000000000',
+  '-0x8000000000000000',
+  '0xffdfffffffffffff',
+])('preserves unsafe SQLite hexadecimal default %s without rounding', (source) => {
+  expect(literalDefault(source)).toEqual({ kind: 'sql', sql: source })
+  expect(literalDefault(source)).not.toEqual({ kind: 'literal', value: 9007199254740992 })
 })

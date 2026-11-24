@@ -185,6 +185,21 @@ test('separate ZenStack policy identities preserve every authored declaration', 
   ).toHaveLength(1)
 })
 
+test('RLS scopes policy findings while using all policies to evaluate table coverage', () => {
+  const included = { ...policy, name: 'included', using: 'true', permissive: false }
+  const excluded = { ...policy, name: 'excluded', using: 'true' }
+  const result = inspect('postgres/rls', [table, rlsState, included, excluded], {
+    include: ['app.orders.*'],
+    exclude: ['app.orders.excluded'],
+    kinds: ['policy'],
+    commands: ['select'],
+    roles: ['app_role'],
+    noBroad: true,
+  })
+  expect(result.reports).toHaveLength(1)
+  expect(result.reports[0]?.node.name).toBe('included')
+})
+
 test('RLS applies kind selectors and recognizes boolean casts without guessing ALTER policy mode', () => {
   const cast = { ...policy, using: 'CAST((TRUE::pg_catalog.bool) AS boolean)' }
   const rules = { kinds: ['policy'], noBroad: true }

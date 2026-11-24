@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Kysely, PostgresDialect, sql } from 'kysely'
@@ -14,12 +15,13 @@ describe.skipIf(postgresUrl === undefined)('PostgreSQL lint catalog', () => {
     })
     const adapter = createKyselyAdapter(db, 'postgresql')
     const schema = 'zenlev_lint_catalog'
-    const shadow = 'pgapp'
+    const shadow = 'pgapp_zenlev_lint_' + randomUUID().replaceAll('-', '')
+    let shadowCreated = false
     try {
       await sql.raw('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE').execute(db)
-      await sql.raw('DROP SCHEMA IF EXISTS ' + shadow + ' CASCADE').execute(db)
       await sql.raw('CREATE SCHEMA ' + schema).execute(db)
-      await sql.raw('CREATE SCHEMA ' + shadow).execute(db)
+      await sql`CREATE SCHEMA ${sql.id(shadow)}`.execute(db)
+      shadowCreated = true
       const empty = await readBuiltinLintCatalog({ adapter, namespaces: [schema] })
       expect(empty.nodes.map((node) => node.kind)).toEqual(['schema'])
       expect(
@@ -225,7 +227,7 @@ describe.skipIf(postgresUrl === undefined)('PostgreSQL lint catalog', () => {
       try {
         await sql.raw('DROP EVENT TRIGGER IF EXISTS zenlev_lint_catalog_event').execute(db)
         await sql.raw('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE').execute(db)
-        await sql.raw('DROP SCHEMA IF EXISTS ' + shadow + ' CASCADE').execute(db)
+        if (shadowCreated) await sql`DROP SCHEMA ${sql.id(shadow)} CASCADE`.execute(db)
       } finally {
         await db.destroy()
       }
@@ -305,9 +307,17 @@ describe.skipIf(postgresUrl === undefined)('PostgreSQL lint catalog', () => {
 
   test('push checks ZModel declarations in schemas containing dots', async () => {
     const cwd = await mkdtemp(join(import.meta.dir, '.zenlev-lint-push-'))
-    const namespace = 'zenlev_lint.push'
+    const suffix = randomUUID().replaceAll('-', '')
+    const namespace = 'zenlev_lint.push_' + suffix
+    const ledger = 'zenlev_lint_push_ledger_' + suffix
     const db = new Kysely<any>({
-      dialect: new PostgresDialect({ pool: new Pool({ connectionString: postgresUrl!, max: 1 }) }),
+      dialect: new PostgresDialect({
+        pool: new Pool({
+          connectionString: postgresUrl!,
+          max: 1,
+          options: '-c search_path=public',
+        }),
+      }),
     })
     try {
       await Bun.write(
@@ -327,6 +337,7 @@ describe.skipIf(postgresUrl === undefined)('PostgreSQL lint catalog', () => {
       const zenlev = await createZenlev({
         cwd,
         adapter: createKyselyAdapter(db, 'postgresql'),
+        store: { schemaName: ledger },
         plugins: [lintPlugin()],
       })
       try {
@@ -335,7 +346,7 @@ describe.skipIf(postgresUrl === undefined)('PostgreSQL lint catalog', () => {
         expect(result.diagnostics).toContainEqual(
           expect.objectContaining({
             ruleId: 'zenlev/naming/model-case',
-            identity: '"zenlev_lint.push".badModel',
+            identity: '"' + namespace + '".badModel',
           }),
         )
         const { rows } =
@@ -345,8 +356,12 @@ describe.skipIf(postgresUrl === undefined)('PostgreSQL lint catalog', () => {
         await zenlev.close()
       }
     } finally {
-      await db.destroy()
-      await rm(cwd, { recursive: true, force: true })
+      try {
+        await sql`DROP SCHEMA IF EXISTS ${sql.id(ledger)} CASCADE`.execute(db)
+      } finally {
+        await db.destroy()
+        await rm(cwd, { recursive: true, force: true })
+      }
     }
   })
 })

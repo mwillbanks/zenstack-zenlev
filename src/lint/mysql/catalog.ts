@@ -13,7 +13,13 @@ export async function mysql(
   db: Kysely<any>,
   namespaces: readonly string[] | undefined,
 ): Promise<LintInput> {
-  const current = await rows(db, sql<{ name: string | null }>`SELECT DATABASE() AS name`)
+  const current = await rows(
+    db,
+    sql<{
+      name: string | null
+      case_mode: number
+    }>`SELECT DATABASE() AS name, @@lower_case_table_names AS case_mode`,
+  )
   const requested = namespaces ?? (current[0]?.name ? [current[0].name] : [])
   if (requested.length === 0) throw new Error('Live lint requires a selected MySQL database')
   const visible = await rows(
@@ -22,7 +28,12 @@ export async function mysql(
       name: string
     }>`SELECT SCHEMA_NAME AS name FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME`,
   )
-  const selected = requested.filter((name) => visible.some((schema) => schema.name === name))
+  const caseInsensitive = current[0]?.case_mode === 1 || current[0]?.case_mode === 2
+  const matches = (left: string, right: string) =>
+    caseInsensitive ? left.toLowerCase() === right.toLowerCase() : left === right
+  const selected = visible
+    .filter((schema) => requested.some((name) => matches(schema.name, name)))
+    .map((schema) => schema.name)
   const nodes: LintNode[] = selected.map((name) => node('mysql', 'schema', name))
   const gaps: LintGap[] = [
     {
@@ -31,7 +42,7 @@ export async function mysql(
     },
   ]
   for (const name of requested)
-    if (!selected.includes(name))
+    if (!selected.some((schema) => matches(schema, name)))
       gaps.push({ message: 'Configured MySQL database is absent or unavailable', identity: name })
   if (selected.length === 0) return { nodes, gaps, capabilities: ['schemas'] }
   const tables = await rows(

@@ -343,13 +343,33 @@ test('write lint forgets indexes removed by an earlier table drop', async () => 
     await ctx.db.schema.dropIndex('items_id').ifExists().execute()
   `,
   )
+  const indexDrops: string[] = []
   const zenlev = await createZenlev({
     cwd,
     adapter: createKyselyAdapter(db, 'sqlite'),
     plugins: [lintPlugin()],
+    lint: {
+      plugins: [
+        {
+          meta: { name: 'test' },
+          rules: {
+            'record-index-drop': {
+              meta: { messages: {} },
+              create: () => ({
+                index(node) {
+                  if (node.action === 'drop') indexDrops.push(node.identity ?? node.name)
+                },
+              }),
+            },
+          },
+        },
+      ],
+      rules: { 'test/record-index-drop': 'error' },
+    },
   })
   try {
     expect((await zenlev.migrate.apply()).status).toBe('ok')
+    expect(indexDrops).toEqual(['main.items_id'])
     expect(
       sqlite.query("SELECT name FROM sqlite_schema WHERE name IN ('items', 'items_id')").all(),
     ).toEqual([])

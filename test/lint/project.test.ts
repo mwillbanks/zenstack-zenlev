@@ -63,11 +63,12 @@ for (const dialect of ['sqlite', 'mysql', 'postgresql'] as const) {
         ...(dialect === 'postgresql' ? { schema: 'public' } : {}),
       }),
     )
-    expect(
-      input.nodes
-        .filter((node) => node.kind === 'unique' || node.kind === 'index')
-        .every((node) => node.nameKnown === false),
-    ).toBe(true)
+    expect(input.nodes.filter(({ kind }) => kind === 'unique' || kind === 'index')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'unique', nameKnown: false }),
+        expect.objectContaining({ kind: 'index', nameKnown: false }),
+      ]),
+    )
   })
 }
 

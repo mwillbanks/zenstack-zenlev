@@ -85,8 +85,10 @@ function identity(node: LintNode): string {
   if (node.identity) return node.identity
   const tableName = node.table === node.name ? undefined : node.table
   return (
-    qualifiedIdentity(node.schema, ...(tableName === undefined ? [] : [tableName]), node.name) +
-    (node.signature === undefined ? '' : '(' + node.signature + ')')
+    qualifiedIdentity(
+      node.schema,
+      ...[tableName, node.name].filter((part): part is string => Boolean(part)),
+    ) + (node.signature === undefined ? '' : '(' + node.signature + ')')
   )
 }
 

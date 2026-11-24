@@ -49,6 +49,8 @@ The `objects/restricted` rule permits `drop` and `call` by default. Configure `a
 
 `trustedSearchPath` applies to PostgreSQL functions and procedures. A missing execution mode or search path produces a coverage gap where applicable. Use `objects/restricted` to govern materialized views.
 
+The PostgreSQL RLS rule applies `include` and `exclude` to individual policy findings. It uses all policies on each selected table to evaluate operation coverage.
+
 ## Example company conventions
 
 This example selects plural physical tables, explicit relation entities, UUID primary keys, ordered constraint names, audit columns, and reverse foreign key indexes.

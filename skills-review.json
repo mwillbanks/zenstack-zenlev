@@ -12,11 +12,11 @@
     }
   },
   "zenlev-migration-authoring": {
-    "reason": "Verified static migration analysis, ZModel physical evidence, and snapshot identities during apply.",
+    "reason": "Verified static migration initialization analysis and the lint rule reference against the follow-up regressions.",
     "files": {
       "src/database.ts": "e424ec1589de3c770a6e0a552f3635e6bb8937370a3d0af14b07c117d6416a4b",
       "src/lint/project.ts": "a442054ac441684e36aed583cf646bee87ec8e70908b20f8a8d4fd43f581eef2",
-      "src/lint/source/migration.ts": "03fc5b5e5bf3fd8f98d5d0d95fa03216faf950967c3291eb094c8e59d2df19fa",
+      "src/lint/source/migration.ts": "e52e5d79b3429164531ca596177018924cd7385725e36c125e424afac5a223fe",
       "src/lint/zmodel.ts": "7830287f86eec7153c5c85e22d69612adc29054103894eb90b482947c9ebc12f",
       "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
       "src/migrate/files.ts": "02eb7ce82e97b2f81c322e375c90219dc894b63315636068da763afedfb1bfa3",
@@ -25,15 +25,15 @@
       "website/content/docs/guides/linting.mdx": "aeb5d0bbe3d8972261365c2c1af473049280491b4662d9fddbd010517bd22825",
       "website/content/docs/guides/migrations.mdx": "f28c99f690d20c725366ed73312b211d44c43fc05cb127b5bf114d36fbd85a53",
       "website/content/docs/reference/commands.mdx": "43f6fd2566ed74b41778c7774591aa1216e60926dadbe5ab77fb3acf66ad485b",
-      "website/content/docs/reference/lint-rules.mdx": "8483c0953c1df78b90083a72777957f70e56c42a7f22a2082271035ee69339a4"
+      "website/content/docs/reference/lint-rules.mdx": "030bd205581ab94d868a65d8d219f5db0827e06902497fba13025bfe3a5ad033"
     }
   },
   "zenlev-plugin-authoring": {
-    "reason": "Verified catalog identity matching, write-plan snapshot fields, and updated lint-rule examples.",
+    "reason": "Verified qualified identity selectors, RLS policy scope, and the lint rule reference.",
     "files": {
       "src/engine.ts": "1ad09e9341a1053208bfa608dae83c3b9aaf74fa42c87bf70af3d51705b41bb8",
       "src/lint/plugin.ts": "1b10a800f85ab8d2b0d5083ec477616150d338df580741fe88ec6b7d26b138a0",
-      "src/lint/runner.ts": "ff593b5ff54a758b3756c2d67bb31f8a9063ad55d7a0801d5fab816a5f183449",
+      "src/lint/runner.ts": "2ce9f2f322b12170e5c6ee694194991bdc366a10e69fa8e8ea42428af2175c55",
       "src/lint/types.ts": "27f4343f81fb9cee7d64414013bc79c9c8a32ffe615fcbff088b834b5293110c",
       "src/migrate/execution.ts": "18271b5b5d32b5ad3d0f19a613c14588bbdf56a3cbd5872e1cb9ec555ba991be",
       "src/plugins.ts": "1b20e976048e706635e7650a86357e9a69c910493d463d2e1ea2676fd4286778",
@@ -41,7 +41,7 @@
       "website/content/docs/guides/_skills/zenlev-plugin-authoring/SKILL.md": "81329fd863e59a9f055b7ee1d8ced1ad2a698f8007789d775fbb320a0f0dcfb5",
       "website/content/docs/guides/linting.mdx": "aeb5d0bbe3d8972261365c2c1af473049280491b4662d9fddbd010517bd22825",
       "website/content/docs/reference/api.mdx": "f32cb5c0613b8704be3e68ff25e50d91ea5cb3d68e3b6b059dd6dfe3bdffc385",
-      "website/content/docs/reference/lint-rules.mdx": "8483c0953c1df78b90083a72777957f70e56c42a7f22a2082271035ee69339a4",
+      "website/content/docs/reference/lint-rules.mdx": "030bd205581ab94d868a65d8d219f5db0827e06902497fba13025bfe3a5ad033",
       "website/content/docs/reference/plugins-telemetry.mdx": "b77e0216a3728562d87212d26627bda0682035fd77918331f5a303e5d6864309"
     }
   },

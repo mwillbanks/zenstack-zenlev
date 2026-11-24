@@ -62,6 +62,34 @@ describe('migration source inspection', () => {
     ])
   })
 
+  test('keeps object and class method bodies deferred during module inspection', async () => {
+    const input = await migration(
+      'const object = { run(value = prepare()) { helper() }, get value() { return read() }, set value(value) { save(value) } }; const Model = class { field = initialize(); constructor(value = prepare()) { helper() } run(value = prepare()) { helper() } static run() { helper() } get value() { return read() } set value(value) { save(value) } }; export function up() {}',
+    )
+    expect(input).toMatchObject({ nodes: [], gaps: [] })
+  })
+
+  test.each([
+    '({ [methodKey()]() { deferred() } })',
+    '({ get [accessorKey()]() { return deferred() } })',
+    '({ set [accessorKey()](value) { deferred(value) } })',
+    '(class { [methodKey()]() { deferred() } })',
+    '(class { [fieldKey()] = deferred() })',
+    '(class { static field = initialize() })',
+    '(class { static { initialize() } })',
+    '(class extends baseFactory() {})',
+    '(class { @decorate() method() { deferred() } })',
+    '(() => { immediate() })()',
+    '({ method() { immediate() } }).method()',
+    'new (class { constructor() { immediate() } })()',
+  ])('reports eager initializer effects in %s', async (initializer) => {
+    const input = await migration('const value = ' + initializer + '; export function up() {}')
+    expect(input.nodes).toEqual([])
+    expect(input.gaps.map((gap) => gap.message)).toEqual([
+      'Top-level migration initialization may execute before lint enforcement.',
+    ])
+  })
+
   test('never imports modules and respects handler direction', async () => {
     const input = await migration(
       "import { sql as query } from 'kysely'; throw new Error('must never run'); export async function up(ctx) { await query.raw('CREATE TABLE users (id text PRIMARY KEY)').execute(ctx.db.kysely) } export async function down(ctx) { await query.raw('DROP TABLE users').execute(ctx.db.kysely) }",

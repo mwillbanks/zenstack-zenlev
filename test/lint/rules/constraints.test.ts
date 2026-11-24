@@ -37,7 +37,9 @@ test('required CHECK rules distinguish missing checks from incomplete metadata',
   expect(unavailable.reports).toHaveLength(0)
   expect(unavailable.gaps).toHaveLength(1)
   const check = node('check', '', { table: 'orders', nameKnown: false })
-  expect(inspect('constraints/required-check', [partial, check]).gaps).toHaveLength(0)
+  const present = inspect('constraints/required-check', [partial, check])
+  expect(present.reports).toHaveLength(0)
+  expect(present.gaps).toHaveLength(0)
   const unavailableName = inspect('constraints/required-check', [table, check], {
     names: ['total'],
   })
@@ -48,7 +50,17 @@ test('required CHECK rules distinguish missing checks from incomplete metadata',
 test('foreign key indexes are checked for every unnamed foreign key', () => {
   const first = { ...fk, name: '' }
   const second = { ...first, columns: ['account_id'], targetTable: 'accounts' }
-  const result = inspect('keys/foreign-key-index', [table, second, first, index])
+  const result = inspect('keys/foreign-key-index', [table, first, second, index])
   expect(result.reports).toHaveLength(1)
   expect(result.messages[0]).toContain('account_id')
+})
+
+test('uses a qualified table identity for unnamed constraints without a supplied identity', () => {
+  const unnamed = { ...fk, name: '', columns: ['incorrect_id'] }
+  expect(
+    inspect('naming/foreign-key', [unnamed], { include: ['app.orders'] }).reports,
+  ).toHaveLength(1)
+  expect(
+    inspect('naming/foreign-key', [unnamed], { exclude: ['app.orders'] }).reports,
+  ).toHaveLength(0)
 })

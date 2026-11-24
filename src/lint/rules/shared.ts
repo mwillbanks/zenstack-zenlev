@@ -35,7 +35,10 @@ export function matches(value: string, pattern: string): boolean {
 }
 
 export function qualified(node: LintNode): string {
-  return identity(node.schema, ...(node.table === undefined ? [] : [node.table]), node.name)
+  return identity(
+    node.schema,
+    ...[node.table, node.name].filter((part): part is string => Boolean(part)),
+  )
 }
 
 export function tableIdentity(node: LintNode): string {

@@ -157,6 +157,25 @@ export async function readMigrationLintInputs(
   const inspectInitialization = (node: import('typescript-ast').Node): void => {
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return
     if (
+      ts.isMethodDeclaration(node) ||
+      ts.isGetAccessorDeclaration(node) ||
+      ts.isSetAccessorDeclaration(node) ||
+      ts.isConstructorDeclaration(node) ||
+      ts.isPropertyDeclaration(node)
+    ) {
+      if (node.name && ts.isComputedPropertyName(node.name))
+        inspectInitialization(node.name.expression)
+      for (const decorator of ts.canHaveDecorators(node) ? (ts.getDecorators(node) ?? []) : [])
+        inspectInitialization(decorator.expression)
+      if (
+        ts.isPropertyDeclaration(node) &&
+        node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword) &&
+        node.initializer
+      )
+        inspectInitialization(node.initializer)
+      return
+    }
+    if (
       ts.isCallExpression(node) ||
       ts.isNewExpression(node) ||
       ts.isTaggedTemplateExpression(node) ||

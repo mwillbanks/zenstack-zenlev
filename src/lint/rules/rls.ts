@@ -84,6 +84,7 @@ const rls = defineRule('Check configured PostgreSQL native row security.', (cont
       }
       const policies = [...state.policies.values()]
       for (const policy of policies) {
+        if (!selected(policy, config)) continue
         const unknownOperation = policy.action === 'alter' && policy.command === undefined
         const operation = policy.command?.toLowerCase() ?? 'all'
         if (config.explicitWriteCheck === true) {

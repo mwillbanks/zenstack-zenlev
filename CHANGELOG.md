@@ -17,6 +17,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 - Preserve constraint, index, and policy identities when checking planned changes against the database catalog.
 - Report gaps in column, constraint, and routine metadata without treating unknown values as policy violations.
 - Preserve schema definitions and object dependencies when diffing SQLite, PostgreSQL, and MySQL catalogs.
+- Respect MySQL namespace case modes and preserve SQLite hexadecimal default precision.
 
 ## [0.2.0] - 2026-11-23
 
