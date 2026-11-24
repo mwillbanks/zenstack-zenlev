@@ -98,6 +98,7 @@ export function tableDefinitions(
           table: item.name,
           schema: item.schema,
           columns: columnList(definition, current),
+          ...(constraintKind === 'unique' ? { unique: true } : {}),
           generated: constraint === undefined,
           explicit: constraint !== undefined,
           identity: identity(
@@ -128,26 +129,39 @@ export function tableDefinitions(
     const column = identifier(definition, current)
     if (!column) return
     const surface = topLevel(definition)
+    const serialDefault =
+      dialect === 'mysql'
+        ? surface.find(
+            (token, index) =>
+              definition.indexOf(token) > current + 1 &&
+              keyword(token, 'SERIAL') &&
+              keyword(surface[index + 1], 'DEFAULT') &&
+              keyword(surface[index + 2], 'VALUE'),
+          )
+        : undefined
     const boundary = definition.findIndex(
       (token, index) =>
-        index > current &&
-        surface.includes(token) &&
-        [
-          'PRIMARY',
-          'NOT',
-          'NULL',
-          'DEFAULT',
-          'CONSTRAINT',
-          'UNIQUE',
-          'REFERENCES',
-          'CHECK',
-          'GENERATED',
-          'COLLATE',
-          'AUTO_INCREMENT',
-        ].some((word) => keyword(token, word)),
+        token === serialDefault ||
+        (index > current &&
+          surface.includes(token) &&
+          [
+            'PRIMARY',
+            'NOT',
+            'NULL',
+            'DEFAULT',
+            'CONSTRAINT',
+            'UNIQUE',
+            'REFERENCES',
+            'CHECK',
+            'GENERATED',
+            'COLLATE',
+            'AUTO_INCREMENT',
+          ].some((word) => keyword(token, word))),
     )
     const type = typeName(definition.slice(current + 1, boundary < 0 ? undefined : boundary))
-    const defaultToken = surface.find((token) => keyword(token, 'DEFAULT'))
+    const defaultToken = surface.find(
+      (token, index) => keyword(token, 'DEFAULT') && surface[index - 1] !== serialDefault,
+    )
     const defaultIndex = defaultToken ? definition.indexOf(defaultToken) : -1
     const defaultEnd = definition.findIndex(
       (token, index) =>
@@ -157,7 +171,7 @@ export function tableDefinitions(
           keyword(token, word),
         ),
     )
-    const serial = serialType(type, dialect)
+    const serial = serialType(type, dialect) || serialDefault !== undefined
     const explicitMysqlNull =
       dialect === 'mysql' &&
       surface.some(
@@ -207,9 +221,21 @@ export function tableDefinitions(
             ),
           }),
     })
-    const addInline = (kind: string, operation: string, extra: Partial<LintNode> = {}) => {
+    const addInline = (
+      kind: string,
+      operation: string,
+      extra: Partial<LintNode> = {},
+      implicit = false,
+    ) => {
       for (const [index, token] of definition.entries()) {
-        if (!surface.includes(token) || !keyword(token, operation)) continue
+        if (
+          !surface.includes(token) ||
+          !(
+            keyword(token, operation) ||
+            (implicit && index === current + 1 && position(surface, operation) < 0)
+          )
+        )
+          continue
         const named = keyword(definition[index - 2], 'CONSTRAINT')
           ? definition[index - 1]
           : undefined
@@ -252,7 +278,7 @@ export function tableDefinitions(
       })
     }
     addInline('check', 'CHECK')
-    addInline('unique', 'UNIQUE', { unique: true })
+    addInline('unique', 'UNIQUE', { unique: true }, dialect === 'mysql' && serial)
   }
 
   return { extractTable, extractDefinition }

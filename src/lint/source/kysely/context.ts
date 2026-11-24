@@ -50,6 +50,7 @@ export function constraint(
 ): LintNode {
   return emit(context, kind, name ?? '', {
     columns,
+    ...(kind === 'unique' ? { unique: true } : {}),
     generated: name === undefined,
     explicit: name !== undefined,
     identity: identity(

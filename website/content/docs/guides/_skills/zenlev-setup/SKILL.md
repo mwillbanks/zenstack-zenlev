@@ -14,8 +14,12 @@ metadata:
     src/database.ts
     src/config.ts
     src/lint/source/kysely.ts
+    src/lint/source/sql.ts
     src/lint/plugin.ts
     src/lint/sqlite/catalog.ts
+    src/lint/mysql/parser.ts
+    src/lint/postgresql/parser.ts
+    src/lint/sqlite/parser.ts
     src/schema/diff/evidence.ts
     src/types.ts
 ---

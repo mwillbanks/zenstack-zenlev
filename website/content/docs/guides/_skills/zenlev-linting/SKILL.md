@@ -25,6 +25,9 @@ metadata:
     src/lint/source/query.ts
     src/lint/source/tokens.ts
     src/lint/sqlite/catalog.ts
+    src/lint/mysql/parser.ts
+    src/lint/postgresql/parser.ts
+    src/lint/sqlite/parser.ts
     src/schema/diff.ts
     src/schema/diff/evidence.ts
     src/schema/commands.ts

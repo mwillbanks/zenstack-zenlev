@@ -25,6 +25,59 @@ async function migration(
 }
 
 describe('migration source inspection', () => {
+  test.each(['postgresql', 'mysql'])(
+    'projects %s SERIAL unique evidence consistently with SQL',
+    async (dialect) => {
+      for (const [modifier, clause, count] of [
+        ['', '', dialect === 'mysql' ? 1 : 0],
+        [',c=>c.primaryKey()', ' PRIMARY KEY', dialect === 'mysql' ? 1 : 0],
+        [',c=>c.unique()', ' UNIQUE', 1],
+      ] as const) {
+        const input = await migration(
+          "export async function up(ctx) { await ctx.db.schema.createTable('records').addColumn('id','serial'" +
+            modifier +
+            ').execute(); }',
+          dialect,
+        )
+        const raw = await parseSqlLintInput(
+          'CREATE TABLE records (id SERIAL' + clause + ');',
+          dialect,
+          source,
+        )
+        for (const evidence of [input, raw]) {
+          const unique = evidence.nodes.filter(({ kind }) => kind === 'unique')
+          expect(unique).toHaveLength(count)
+          if (count)
+            expect(unique[0]).toMatchObject({
+              columns: ['id'],
+              unique: true,
+              generated: true,
+              explicit: false,
+            })
+        }
+      }
+      for (const declaration of [
+        ".addColumn('id','serial').addUniqueConstraint('named',['id'])",
+        ".addUniqueConstraint('named',['id']).addColumn('id','serial')",
+      ]) {
+        const separate = await migration(
+          "export async function up(ctx) { await ctx.db.schema.createTable('records')" +
+            declaration +
+            '.execute(); }',
+          dialect,
+        )
+        expect(separate.nodes.filter(({ kind }) => kind === 'unique')).toHaveLength(
+          dialect === 'mysql' ? 2 : 1,
+        )
+        expect(node(separate, 'unique', 'named')).toMatchObject({
+          unique: true,
+          explicit: true,
+          generated: false,
+        })
+      }
+    },
+  )
+
   test('leaves portable serial nullability unknown while retaining explicit notNull', async () => {
     const path = join(directory, 'portable.ts')
     await Bun.write(

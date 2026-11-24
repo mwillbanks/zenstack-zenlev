@@ -25,12 +25,15 @@ function addColumn(call: CallExpression, context: BuilderContext): void {
     Object.assign(column, { partial: true, nullable: undefined })
     context.gap(node, message)
   }
+  let inlineUnique = false
   for (const modifier of modifierCalls(call.arguments[2], uncertain)) {
     const method = methodOf(modifier)
     if (method === 'primaryKey') constraint(context, 'primary-key', undefined, [name])
     else if (method === 'notNull') Object.assign(column, { nullable: false })
-    else if (method === 'unique') constraint(context, 'unique', undefined, [name])
-    else if (method === 'autoIncrement') Object.assign(column, { sequential: true })
+    else if (method === 'unique') {
+      inlineUnique = true
+      constraint(context, 'unique', undefined, [name])
+    } else if (method === 'autoIncrement') Object.assign(column, { sequential: true })
     else if (method === 'defaultTo') {
       const value = expression(modifier.arguments[0], context)
       if (value === undefined) uncertain(modifier, 'Dynamic Kysely default cannot be analyzed.')
@@ -57,6 +60,8 @@ function addColumn(call: CallExpression, context: BuilderContext): void {
         context.gap(modifier, 'Dynamic Kysely referential action cannot be analyzed.')
     } else uncertain(modifier, 'Kysely column modifier is outside static analysis: ' + method)
   }
+  if (context.dialect === 'mysql' && serialType(type, context.dialect) && !inlineUnique)
+    constraint(context, 'unique', undefined, [name], { unique: true })
 }
 
 export function readTable(calls: readonly CallExpression[], initial: BuilderContext): void {

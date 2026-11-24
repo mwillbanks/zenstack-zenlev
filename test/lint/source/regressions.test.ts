@@ -3,6 +3,34 @@ import { parseSqlLintInput } from '../../../src/lint/source'
 import { node, source } from './fixtures'
 
 describe('SQL source evidence regressions', () => {
+  test('infers MySQL SERIAL unique keys without duplicating inline constraints', async () => {
+    for (const [column, tableConstraint, count] of [
+      ['SERIAL NULL', '', 1],
+      ['SERIAL UNIQUE', '', 1],
+      ['SERIAL', ', UNIQUE(id)', 2],
+      ['SERIAL', ', CONSTRAINT named UNIQUE(id)', 2],
+      ['BIGINT SERIAL DEFAULT VALUE', '', 1],
+    ] as const) {
+      const input = await parseSqlLintInput(
+        'CREATE TABLE records (id ' + column + tableConstraint + ');',
+        'mysql',
+        source,
+      )
+      expect(input.gaps).toEqual([])
+      const unique = input.nodes.filter(({ kind }) => kind === 'unique')
+      expect(unique).toHaveLength(count)
+      expect(new Set(unique.map(({ identity }) => identity)).size).toBe(count)
+      if (column === 'BIGINT SERIAL DEFAULT VALUE') {
+        expect(node(input, 'column', 'id')).toMatchObject({
+          type: 'BIGINT',
+          nullable: false,
+          sequential: true,
+        })
+        expect(node(input, 'column', 'id').default).toBeUndefined()
+      }
+    }
+  })
+
   test('distinguishes MySQL SERIAL NULL from default and referential NULL tokens', async () => {
     const input = await parseSqlLintInput(
       'CREATE TABLE records (explicit SERIAL NULL, implicit SERIAL, defaulted SERIAL DEFAULT NULL, referenced SERIAL REFERENCES parents(id) ON DELETE SET NULL);',
