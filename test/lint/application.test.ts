@@ -330,6 +330,69 @@ test('rejects a low-level ZenStack builder imported into standalone code', async
   ])
 })
 
+test('checks SQL in defaults and traces a client from an absent tuple element', async () => {
+  await write(
+    'app/defaults.ts',
+    [
+      "import { ZenStackClient } from '@zenstackhq/orm'",
+      "import { sql } from 'kysely'",
+      'const known = new ZenStackClient(schema, options)',
+      'const [db = known] = []',
+      "db.$queryRawUnsafe('select 1')",
+      'const [other = known] = [{}]',
+      "other.$queryRawUnsafe('not a database call')",
+      'function get(value = sql`select 1`) { return value }',
+      'const [fallback = sql`select 2`] = []',
+    ].join('\n'),
+  )
+  const result = await lint()
+  expect(result.diagnostics.map(({ ruleId, source }) => [ruleId, source?.line])).toEqual(
+    [5, 8, 9].map((line) => [prefix + 'no-raw', line]),
+  )
+})
+
+test('handles deferred client captures without mistaking parameter shadows for clients', async () => {
+  await write(
+    'app/captures.ts',
+    [
+      "import { ZenStackClient } from '@zenstackhq/orm'",
+      "function run() { db.$queryRawUnsafe('select 1') }",
+      "function unrelated(db) { db.$queryRawUnsafe('not a database call') }",
+      'const db = new ZenStackClient(schema, options)',
+      'run()',
+    ].join('\n'),
+  )
+  const result = await lint()
+  const lines = [
+    ...result.diagnostics.map(({ source }) => source?.line),
+    ...result.coverage.gaps.map(({ source }) => source?.line),
+  ]
+  expect(lines).toEqual([2])
+  expect(result.diagnostics.every(({ ruleId }) => ruleId === prefix + 'no-raw')).toBe(true)
+})
+
+test('hoists var declarations and preserves the outer client across switch cases', async () => {
+  await write(
+    'app/scopes.ts',
+    [
+      "import { ZenStackClient } from '@zenstackhq/orm'",
+      '{ var db = new ZenStackClient(schema, options) }',
+      "db.$queryRawUnsafe('select 1')",
+      "switch (flag) { case 0: const db = {}; db.$queryRawUnsafe('not a database call'); break }",
+      "db.$queryRawUnsafe('select 2')",
+      'function run() {',
+      '  { var inner = db }',
+      "  inner.$queryRawUnsafe('select 3')",
+      '}',
+    ].join('\n'),
+  )
+  const result = await lint()
+  expect(result.diagnostics.map(({ ruleId, source }) => [ruleId, source?.line])).toEqual(
+    [3, 5, 8].map((line) => [prefix + 'no-raw', line]),
+  )
+  expect(result.coverage.gaps).toEqual([])
+})
+
 test('validates source input and query options before scanning', async () => {
   await expect(lint({ source: [''] })).rejects.toThrow('lint.source')
   await expect(

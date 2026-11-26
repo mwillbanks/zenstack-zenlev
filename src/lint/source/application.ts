@@ -4,6 +4,7 @@ import { parseSync, visitorKeys, type Node, type Program } from 'oxc-parser'
 import type { LintGap, LintInput, LintNode, LintSource } from '../types'
 import { sourceAt } from './tokens'
 import {
+  applicationDatabaseValue,
   applicationMember,
   applicationName,
   applicationProperty,
@@ -36,9 +37,45 @@ function declarations(statement: Node): readonly Node[] {
   return []
 }
 
-function predeclare(body: readonly Node[], scope: ApplicationScope): void {
-  for (const statement of body)
+function predeclare(body: readonly Node[], scope: ApplicationScope, hoisted = false): void {
+  for (const statement of body) {
+    const declaration =
+      statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type === 'VariableDeclaration' && declaration.kind === 'var' && !hoisted)
+      continue
     for (const id of declarations(statement)) bindApplicationValue(id, undefined, scope)
+  }
+  for (const statement of body) {
+    const declaration =
+      statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type !== 'VariableDeclaration' || (declaration.kind === 'var' && !hoisted))
+      continue
+    for (const binding of declaration.declarations) {
+      const candidates = new Map(scope)
+      bindApplicationValue(binding.id, applicationValue(binding.init, scope), candidates)
+      for (const [name, value] of candidates)
+        if (
+          value !== scope.get(name) &&
+          (applicationDatabaseValue(value) || value?.kind === 'unknown')
+        )
+          scope.set(name, unknownValue)
+    }
+  }
+}
+
+function hoistedDeclarations(node: Node): Node[] {
+  if (
+    [
+      'FunctionDeclaration',
+      'FunctionExpression',
+      'ArrowFunctionExpression',
+      'ClassDeclaration',
+      'ClassExpression',
+    ].includes(node.type)
+  )
+    return []
+  if (node.type === 'VariableDeclaration' && node.kind === 'var') return [node]
+  return children(node).flatMap(hoistedDeclarations)
 }
 
 function mergeAssignments(
@@ -199,27 +236,30 @@ async function readApplication(
       )
         emit(node, 'direct-kysely', name, value.direct === 'low-level' ? 'low-level' : mode)
     }
-    function destructureEffects(pattern: Node, value: ApplicationValue | undefined): void {
-      if (!value) return
-      if (pattern.type === 'ObjectPattern') {
-        for (const property of pattern.properties) {
-          if (property.type !== 'Property') continue
-          const name =
-            property.computed && property.key.type !== 'Literal'
-              ? undefined
-              : applicationName(property.key)
-          if (name === undefined)
-            gap(property, 'Dynamic database member access requires manual review.')
-          else {
-            const member = applicationProperty(value, name)
-            effects(property, member, name)
-            destructureEffects(property.value, member)
-          }
-        }
-      } else if (pattern.type === 'ArrayPattern') {
-        for (const [index, element] of pattern.elements.entries())
-          if (element) destructureEffects(element, applicationProperty(value, String(index)))
-      } else if (pattern.type === 'AssignmentPattern') destructureEffects(pattern.left, value)
+    function propertyEffects(
+      node: Node,
+      object: ApplicationValue | undefined,
+      name: string | undefined,
+    ): void {
+      if (name !== undefined) {
+        effects(node, applicationProperty(object, name), name)
+        if (object?.kind === 'unknown' && unresolvedQueryMember(name))
+          gap(
+            node,
+            'Query client provenance cannot be resolved statically; review this application query.',
+          )
+      } else if (applicationDatabaseValue(object))
+        gap(node, 'Dynamic database member access requires manual review.')
+    }
+    function bind(
+      pattern: Node,
+      value: ApplicationValue | undefined,
+      local: ApplicationScope,
+    ): void {
+      bindApplicationValue(pattern, value, local, {
+        expression: (node) => visit(node, local),
+        property: propertyEffects,
+      })
     }
     function visitFunction(
       node: Node,
@@ -234,9 +274,19 @@ async function readApplication(
         return
       const local = new Map(parent)
       if ('id' in node && node.id) local.set(node.id.name, undefined)
-      for (const parameter of node.params) bindApplicationValue(parameter, undefined, local)
-      if (transaction && node.params[0]) bindApplicationValue(node.params[0], transaction, local)
-      if (node.body) visit(node.body, local)
+      const parameters: ApplicationScope = new Map()
+      for (const parameter of node.params) {
+        bindApplicationValue(parameter, undefined, local)
+        bindApplicationValue(parameter, undefined, parameters)
+      }
+      for (const [index, parameter] of node.params.entries())
+        bind(parameter, index === 0 ? transaction : undefined, local)
+      if (node.body) {
+        const body = new Map(local)
+        predeclare(hoistedDeclarations(node.body), body, true)
+        for (const name of parameters.keys()) body.set(name, local.get(name))
+        visit(node.body, body)
+      }
     }
     function visit(node: Node, local: ApplicationScope): void {
       if (
@@ -317,13 +367,31 @@ async function readApplication(
         mergeAssignments(local, loop, true, shadowed)
         return
       }
+      if (node.type === 'SwitchStatement') {
+        visit(node.discriminant, local)
+        const branch = new Map(local)
+        const shadowed: ApplicationScope = new Map()
+        const statements = node.cases.flatMap((entry) => entry.consequent)
+        predeclare(statements, branch)
+        predeclare(statements, shadowed)
+        for (const entry of node.cases) {
+          if (entry.test) visit(entry.test, branch)
+          for (const statement of entry.consequent) visit(statement, branch)
+          mergeAssignments(local, branch, true, shadowed)
+        }
+        return
+      }
+      if (node.type === 'VariableDeclaration') {
+        for (const declaration of node.declarations)
+          if (node.kind !== 'var' || declaration.init) visit(declaration, local)
+        return
+      }
       if (node.type === 'VariableDeclarator') {
         if (node.init) visit(node.init, local)
         const value = applicationValue(node.init, local)
         if (node.init?.type === 'Identifier' && value?.direct === 'low-level')
           effects(node.init, value, node.init.name)
-        bindApplicationValue(node.id, value, local)
-        destructureEffects(node.id, value)
+        bind(node.id, value, local)
         return
       }
       if (node.type === 'AssignmentExpression') {
@@ -332,23 +400,14 @@ async function readApplication(
         if (node.right.type === 'Identifier' && value?.direct === 'low-level')
           effects(node.right, value, node.right.name)
         const previous = applicationValue(node.left, local)
-        destructureEffects(node.left, value)
-        bindApplicationValue(node.left, value ?? (previous ? unknownValue : undefined), local)
+        bind(node.left, value ?? (previous ? unknownValue : undefined), local)
         return
       }
       if (node.type === 'MemberExpression') {
         visit(node.object, local)
         const object = applicationValue(node.object, local)
         const name = applicationMember(node)
-        if (name) {
-          effects(node, applicationProperty(object, name), name)
-          if (object?.kind === 'unknown' && unresolvedQueryMember(name))
-            gap(
-              node,
-              'Query client provenance cannot be resolved statically; review this application query.',
-            )
-        } else if (object && object.kind !== 'unknown')
-          gap(node, 'Dynamic database member access requires manual review.')
+        propertyEffects(node, object, name)
         if (node.computed) visit(node.property, local)
         return
       }
@@ -403,7 +462,6 @@ async function readApplication(
         gap(node, 'Dynamic application imports require manual review of query provenance.')
       for (const child of children(node)) visit(child, local)
     }
-    predeclare(module.program.body, scope)
     for (const statement of module.program.body) {
       if (statement.type !== 'ImportDeclaration') continue
       const imported = module.imports.get(statement.source.value)
@@ -418,6 +476,8 @@ async function readApplication(
         scope.set(binding.local.name, value)
       }
     }
+    predeclare(hoistedDeclarations(module.program), scope, true)
+    predeclare(module.program.body, scope)
     for (const statement of module.program.body) visit(statement, scope)
     for (const statement of module.program.body) {
       if (statement.type === 'ExportDefaultDeclaration') {

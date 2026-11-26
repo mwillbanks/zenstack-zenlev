@@ -13,7 +13,7 @@ metadata:
 1. Confirm the application directory, installed Zenlev version, configured inputs, and SQL dialect. Read the project's database conventions before changing rules.
 2. Install the matching optional parser peer for authored SQL text and SQLite catalog parsing of stored table definitions. SQLite catalog lint attempts to parse each stored table definition that exists, regardless of the configured rules. Without the SQLite parser, report parse coverage gaps and continue checks supported by available metadata, including PRAGMA results. If a table has no stored definition, only rule-specific facts that depend on it are unavailable. Supported Kysely schema builders and generated statement evidence use structured analysis and do not need a SQL parser peer. A SQLite catalog audit during `db push` still attempts to parse each stored table definition that exists.
 3. Run offline lint first. The default preset checks logical names, physical mappings, primary keys, and application queries selected by `lint.source`.
-4. Review diagnostics and coverage gaps. Check that expected application files, migration source, and SQL files appear in the scan.
+4. Review diagnostics and coverage gaps. Verify input selection from the effective configuration. Do not treat aggregate JSON counts as inventories.
 5. Make the smallest schema, mapping, SQL, or rule change that satisfies the policy. Run the same command again.
 6. Use a live audit only for an authorized destination. Confirm the resolved environment and catalog visibility.
 
@@ -35,6 +35,8 @@ Treat a coverage gap as unavailable evidence. Install a missing parser for SQL t
 ## Check application queries
 
 Set `lint.source` to explicit project-relative TypeScript and JavaScript globs. No application files are selected by default.
+
+Verify the effective `cwd` and expand `lint.source` globs from that directory. Supported extensions are `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, and `.cjs`. Exclude `.d.ts`, `.d.mts`, and `.d.cts` declarations. Remove discovered migration paths from application selection. Inspect `lint.sql` globs and configured migration discovery separately. The JSON file count is aggregate, not a file inventory.
 
 The recommended rules permit `query-builder` and `query-api` styles through `zenlev/queries/allowed-types`. They reject low-level access with `zenlev/queries/no-direct-kysely` and raw SQL with `zenlev/queries/no-raw`. Enable `zenlev/queries/no-schema-changes` when application code must not use schema builders.
 

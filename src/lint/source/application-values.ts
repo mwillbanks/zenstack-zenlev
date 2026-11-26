@@ -12,8 +12,11 @@ export interface ApplicationValue {
     | 'constructor'
     | 'module'
     | 'unknown'
+    | 'absent'
+    | 'other'
   readonly result?: ApplicationValue | undefined
   readonly members?: ReadonlyMap<string, ApplicationValue> | undefined
+  readonly complete?: boolean | undefined
   readonly query?: 'query-builder' | 'query-api' | 'raw' | 'schema-change' | undefined
   readonly direct?: 'kysely' | 'low-level' | undefined
   readonly transaction?: boolean | undefined
@@ -22,6 +25,13 @@ export interface ApplicationValue {
 export type ApplicationScope = Map<string, ApplicationValue | undefined>
 
 export const unknownValue: ApplicationValue = { kind: 'unknown' }
+const absentValue: ApplicationValue = { kind: 'absent' }
+const otherValue: ApplicationValue = { kind: 'other' }
+
+export interface ApplicationBindingObserver {
+  expression(node: Node): void
+  property(node: Node, value: ApplicationValue | undefined, name: string | undefined): void
+}
 const client: ApplicationValue = { kind: 'client' }
 const builder: ApplicationValue = { kind: 'builder' }
 const directBuilder: ApplicationValue = { kind: 'builder', direct: 'kysely' }
@@ -136,12 +146,27 @@ export function knownApplicationModule(name: string): ApplicationValue | undefin
   }
 }
 
+export function applicationDatabaseValue(value: ApplicationValue | undefined): boolean {
+  const pending = value ? [value] : []
+  const seen = new Set<ApplicationValue>()
+  for (const current of pending) {
+    if (seen.has(current)) continue
+    seen.add(current)
+    if (['client', 'builder', 'delegate', 'schema', 'sql', 'driver'].includes(current.kind))
+      return true
+    if (current.result) pending.push(current.result)
+    if (current.members) pending.push(...current.members.values())
+  }
+  return false
+}
+
 export function applicationProperty(
   value: ApplicationValue | undefined,
   name: string,
 ): ApplicationValue | undefined {
   if (!value) return
-  if (value.kind === 'module') return value.members?.get(name) ?? unknownValue
+  if (value.kind === 'module')
+    return value.members?.get(name) ?? (value.complete ? absentValue : unknownValue)
   if (value.kind === 'unknown') return value
   if (value.kind === 'client') {
     if (name === '$qb') return builder
@@ -179,14 +204,36 @@ export function applicationValue(
   scope: ApplicationScope,
 ): ApplicationValue | undefined {
   if (!node) return
-  if (node.type === 'Identifier') return scope.get(node.name)
+  if (node.type === 'Identifier')
+    return node.name === 'undefined' && !scope.has(node.name) ? absentValue : scope.get(node.name)
+  if (node.type === 'Literal') return otherValue
+  if (node.type === 'UnaryExpression' && node.operator === 'void') return absentValue
   if (node.type === 'ArrayExpression') {
+    if (node.elements.some((element) => element?.type === 'SpreadElement')) return unknownValue
     const members = new Map<string, ApplicationValue>()
-    for (const [index, element] of node.elements.entries()) {
-      const value = applicationValue(element, scope)
-      if (value) members.set(String(index), value)
+    for (const [index, element] of node.elements.entries())
+      members.set(
+        String(index),
+        element ? (applicationValue(element, scope) ?? unknownValue) : absentValue,
+      )
+    return { kind: 'module', members, complete: true }
+  }
+  if (node.type === 'ObjectExpression') {
+    const members = new Map<string, ApplicationValue>()
+    let complete = true
+    for (const property of node.properties) {
+      if (property.type === 'SpreadElement') {
+        complete = false
+        continue
+      }
+      const name =
+        property.computed && property.key.type !== 'Literal'
+          ? undefined
+          : applicationName(property.key)
+      if (name === undefined) complete = false
+      else members.set(name, applicationValue(property.value, scope) ?? unknownValue)
     }
-    if (members.size) return { kind: 'module', members }
+    return { kind: 'module', members, complete }
   }
   if (node.type === 'MemberExpression') {
     const name = applicationMember(node)
@@ -229,6 +276,7 @@ export function bindApplicationValue(
   pattern: Node,
   value: ApplicationValue | undefined,
   scope: ApplicationScope,
+  observer?: ApplicationBindingObserver,
 ): void {
   if (pattern.type === 'Identifier') {
     const annotation = pattern.typeAnnotation
@@ -237,24 +285,32 @@ export function bindApplicationValue(
     scope.set(pattern.name, value ?? annotation)
   } else if (pattern.type === 'ObjectPattern') {
     for (const property of pattern.properties) {
-      if (property.type === 'RestElement') bindApplicationValue(property.argument, undefined, scope)
+      if (property.type === 'RestElement')
+        bindApplicationValue(property.argument, undefined, scope, observer)
       else {
         const name =
           property.computed && property.key.type !== 'Literal'
             ? undefined
             : applicationName(property.key)
-        bindApplicationValue(
-          property.value,
-          name === undefined ? undefined : applicationProperty(value, name),
-          scope,
-        )
+        if (property.computed) observer?.expression(property.key)
+        const member = name === undefined ? undefined : applicationProperty(value, name)
+        observer?.property(property, value, name)
+        bindApplicationValue(property.value, member, scope, observer)
       }
     }
   } else if (pattern.type === 'ArrayPattern') {
     for (const [index, element] of pattern.elements.entries())
-      if (element) bindApplicationValue(element, applicationProperty(value, String(index)), scope)
-  } else if (pattern.type === 'AssignmentPattern') bindApplicationValue(pattern.left, value, scope)
-  else if (pattern.type === 'RestElement') bindApplicationValue(pattern.argument, undefined, scope)
+      if (element)
+        bindApplicationValue(element, applicationProperty(value, String(index)), scope, observer)
+  } else if (pattern.type === 'AssignmentPattern') {
+    observer?.expression(pattern.right)
+    const assigned =
+      value?.kind === 'absent'
+        ? (applicationValue(pattern.right, scope) ?? unknownValue)
+        : (value ?? unknownValue)
+    bindApplicationValue(pattern.left, assigned, scope, observer)
+  } else if (pattern.type === 'RestElement')
+    bindApplicationValue(pattern.argument, undefined, scope, observer)
 }
 
 export function unresolvedQueryMember(name: string): boolean {
