@@ -6,9 +6,20 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-26
+
 ### Added
 
 - Check selected application TypeScript and JavaScript for allowed query styles, direct Kysely access, raw SQL, and optional schema changes. Keep migrations exempt from application policy.
+
+### Fixed
+
+- Package versioned agent skills without requiring a separate source review record.
+
+## [0.3.0] - 2026-11-24
+
+### Added
+
 - Ship offline and live database linting with recommended ZModel mapping and primary-key rules, configurable conventions, and lint rule plugins.
 - Add `lintPlugin()` and a final-plan write hook that can reject migration apply and schema push before user SQL executes.
 - Document lint adoption, catalog capabilities, rule configuration, custom plugins, and reviewed exceptions.
@@ -22,7 +33,6 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 
 ### Fixed
 
-- Package versioned agent skills without requiring a separate source review record.
 - Preserve constraint, index, and policy identities when checking planned changes against the database catalog.
 - Track foreign-key index coverage after index drops in offline lint and write plans.
 - Report class, member, and legacy parameter decorators that can run during migration import.
