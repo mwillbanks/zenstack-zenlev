@@ -17,6 +17,8 @@ export interface ApplicationValue {
   readonly result?: ApplicationValue | undefined
   readonly members?: ReadonlyMap<string, ApplicationValue> | undefined
   readonly complete?: boolean | undefined
+  readonly iterable?: boolean | undefined
+  readonly database?: boolean | undefined
   readonly query?: 'query-builder' | 'query-api' | 'raw' | 'schema-change' | undefined
   readonly direct?: 'kysely' | 'low-level' | undefined
   readonly transaction?: boolean | undefined
@@ -29,7 +31,7 @@ const absentValue: ApplicationValue = { kind: 'absent' }
 const otherValue: ApplicationValue = { kind: 'other' }
 
 export interface ApplicationBindingObserver {
-  expression(node: Node): void
+  expression(node: Node, uncertain?: boolean): void
   property(node: Node, value: ApplicationValue | undefined, name: string | undefined): void
 }
 const client: ApplicationValue = { kind: 'client' }
@@ -152,12 +154,41 @@ export function applicationDatabaseValue(value: ApplicationValue | undefined): b
   for (const current of pending) {
     if (seen.has(current)) continue
     seen.add(current)
-    if (['client', 'builder', 'delegate', 'schema', 'sql', 'driver'].includes(current.kind))
+    if (
+      current.database ||
+      ['client', 'builder', 'delegate', 'schema', 'sql', 'driver'].includes(current.kind)
+    )
       return true
     if (current.result) pending.push(current.result)
     if (current.members) pending.push(...current.members.values())
   }
   return false
+}
+
+export function uncertainApplicationValue(
+  ...values: readonly (ApplicationValue | undefined)[]
+): ApplicationValue {
+  return values.some(applicationDatabaseValue) ? { kind: 'unknown', database: true } : unknownValue
+}
+
+export function applicationIterationValue(
+  value: ApplicationValue | undefined,
+  keys: boolean,
+): ApplicationValue | undefined {
+  if (keys) return otherValue
+  if (!value) return
+  if (value?.iterable && value.complete) {
+    const elements = [...(value.members?.values() ?? [])]
+    const first = elements[0]
+    if (first && elements.every((element) => element === first)) return first
+    if (
+      elements.length &&
+      elements.every((element) => element.kind !== 'unknown' && !applicationDatabaseValue(element))
+    )
+      return otherValue
+    return uncertainApplicationValue(...elements)
+  }
+  return uncertainApplicationValue(value)
 }
 
 export function applicationProperty(
@@ -209,29 +240,47 @@ export function applicationValue(
   if (node.type === 'Literal') return otherValue
   if (node.type === 'UnaryExpression' && node.operator === 'void') return absentValue
   if (node.type === 'ArrayExpression') {
-    if (node.elements.some((element) => element?.type === 'SpreadElement')) return unknownValue
+    if (node.elements.some((element) => element?.type === 'SpreadElement'))
+      return uncertainApplicationValue(
+        ...node.elements.map((element) =>
+          applicationValue(element?.type === 'SpreadElement' ? element.argument : element, scope),
+        ),
+      )
     const members = new Map<string, ApplicationValue>()
     for (const [index, element] of node.elements.entries())
       members.set(
         String(index),
         element ? (applicationValue(element, scope) ?? unknownValue) : absentValue,
       )
-    return { kind: 'module', members, complete: true }
+    return { kind: 'module', members, complete: true, iterable: true }
   }
   if (node.type === 'ObjectExpression') {
     const members = new Map<string, ApplicationValue>()
     let complete = true
     for (const property of node.properties) {
       if (property.type === 'SpreadElement') {
-        complete = false
+        const spread = applicationValue(property.argument, scope)
+        if (
+          spread?.kind === 'absent' ||
+          (property.argument.type === 'Literal' && typeof property.argument.value !== 'string')
+        )
+          continue
+        if (spread?.kind !== 'module' || !spread.complete) {
+          complete = false
+          for (const [name, value] of members)
+            members.set(name, uncertainApplicationValue(value, spread))
+        }
+        for (const [name, value] of spread?.members ?? []) members.set(name, value)
         continue
       }
       const name =
         property.computed && property.key.type !== 'Literal'
           ? undefined
           : applicationName(property.key)
-      if (name === undefined) complete = false
-      else members.set(name, applicationValue(property.value, scope) ?? unknownValue)
+      if (name === undefined) {
+        complete = false
+        for (const [name, value] of members) members.set(name, uncertainApplicationValue(value))
+      } else members.set(name, applicationValue(property.value, scope) ?? unknownValue)
     }
     return { kind: 'module', members, complete }
   }
@@ -303,11 +352,14 @@ export function bindApplicationValue(
       if (element)
         bindApplicationValue(element, applicationProperty(value, String(index)), scope, observer)
   } else if (pattern.type === 'AssignmentPattern') {
-    observer?.expression(pattern.right)
-    const assigned =
-      value?.kind === 'absent'
-        ? (applicationValue(pattern.right, scope) ?? unknownValue)
-        : (value ?? unknownValue)
+    let assigned = value
+    if (value?.kind === 'absent') {
+      observer?.expression(pattern.right)
+      assigned = applicationValue(pattern.right, scope) ?? unknownValue
+    } else if (!value || value.kind === 'unknown') {
+      observer?.expression(pattern.right, true)
+      assigned = uncertainApplicationValue(value, applicationValue(pattern.right, scope))
+    }
     bindApplicationValue(pattern.left, assigned, scope, observer)
   } else if (pattern.type === 'RestElement')
     bindApplicationValue(pattern.argument, undefined, scope, observer)

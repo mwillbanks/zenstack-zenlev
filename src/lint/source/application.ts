@@ -5,6 +5,7 @@ import type { LintGap, LintInput, LintNode, LintSource } from '../types'
 import { sourceAt } from './tokens'
 import {
   applicationDatabaseValue,
+  applicationIterationValue,
   applicationMember,
   applicationName,
   applicationProperty,
@@ -12,6 +13,7 @@ import {
   bindApplicationValue,
   knownApplicationModule,
   unknownValue,
+  uncertainApplicationValue,
   unresolvedQueryMember,
   type ApplicationScope,
   type ApplicationValue,
@@ -58,7 +60,7 @@ function predeclare(body: readonly Node[], scope: ApplicationScope, hoisted = fa
           value !== scope.get(name) &&
           (applicationDatabaseValue(value) || value?.kind === 'unknown')
         )
-          scope.set(name, unknownValue)
+          scope.set(name, uncertainApplicationValue(value))
     }
   }
 }
@@ -87,8 +89,16 @@ function mergeAssignments(
   for (const [name, previous] of scope) {
     const value = evaluated.get(name)
     if (!shadowed?.has(name) && value !== previous)
-      scope.set(name, uncertain ? unknownValue : value)
+      scope.set(name, uncertain ? uncertainApplicationValue(previous, value) : value)
   }
+}
+
+function caseExit(node: Node): boolean {
+  if (
+    ['BreakStatement', 'ContinueStatement', 'ReturnStatement', 'ThrowStatement'].includes(node.type)
+  )
+    return true
+  return node.type === 'BlockStatement' && node.body.some(caseExit)
 }
 
 interface ParsedApplicationModule {
@@ -257,9 +267,27 @@ async function readApplication(
       local: ApplicationScope,
     ): void {
       bindApplicationValue(pattern, value, local, {
-        expression: (node) => visit(node, local),
+        expression: (node, uncertain) => {
+          if (!uncertain) visit(node, local)
+          else {
+            const branch = new Map(local)
+            visit(node, branch)
+            mergeAssignments(local, branch, true)
+          }
+        },
         property: propertyEffects,
       })
+    }
+    function assign(
+      pattern: Node,
+      value: ApplicationValue | undefined,
+      local: ApplicationScope,
+    ): void {
+      const previous = applicationValue(pattern, local)
+      let assigned = value
+      if ((!value || value.kind === 'unknown') && previous)
+        assigned = uncertainApplicationValue(previous, value)
+      bind(pattern, assigned, local)
     }
     function visitFunction(
       node: Node,
@@ -344,21 +372,38 @@ async function readApplication(
         mergeAssignments(local, caught, true, shadowed)
         return
       }
+      if (node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
+        const loop = new Map(local)
+        const shadowed: ApplicationScope = new Map()
+        if (node.left.type === 'VariableDeclaration') {
+          predeclare([node.left], loop)
+          predeclare([node.left], shadowed)
+        }
+        visit(node.right, loop)
+        const iterable = applicationValue(node.right, loop)
+        if (!(
+          node.type === 'ForOfStatement' &&
+          iterable?.iterable &&
+          iterable.complete &&
+          iterable.members?.size === 0
+        )) {
+          const value = applicationIterationValue(iterable, node.type === 'ForInStatement')
+          if (node.left.type === 'VariableDeclaration')
+            for (const declaration of node.left.declarations) assign(declaration.id, value, loop)
+          else assign(node.left, value, loop)
+          visit(node.body, loop)
+        }
+        mergeAssignments(local, loop, true, shadowed)
+        return
+      }
       if (
         node.type === 'ForStatement' ||
-        node.type === 'ForInStatement' ||
-        node.type === 'ForOfStatement' ||
         node.type === 'WhileStatement' ||
         node.type === 'DoWhileStatement'
       ) {
         const loop = new Map(local)
         const shadowed: ApplicationScope = new Map()
-        const declaration =
-          node.type === 'ForStatement'
-            ? node.init
-            : node.type === 'ForInStatement' || node.type === 'ForOfStatement'
-              ? node.left
-              : undefined
+        const declaration = node.type === 'ForStatement' ? node.init : undefined
         if (declaration?.type === 'VariableDeclaration') {
           predeclare([declaration], loop)
           predeclare([declaration], shadowed)
@@ -369,15 +414,19 @@ async function readApplication(
       }
       if (node.type === 'SwitchStatement') {
         visit(node.discriminant, local)
-        const branch = new Map(local)
+        const base = new Map(local)
         const shadowed: ApplicationScope = new Map()
         const statements = node.cases.flatMap((entry) => entry.consequent)
-        predeclare(statements, branch)
+        predeclare(statements, base)
         predeclare(statements, shadowed)
+        let fallthrough: ApplicationScope | undefined
         for (const entry of node.cases) {
+          const branch = new Map(base)
+          if (fallthrough) mergeAssignments(branch, fallthrough, true)
           if (entry.test) visit(entry.test, branch)
           for (const statement of entry.consequent) visit(statement, branch)
           mergeAssignments(local, branch, true, shadowed)
+          fallthrough = entry.consequent.some(caseExit) ? undefined : branch
         }
         return
       }
@@ -399,8 +448,7 @@ async function readApplication(
         const value = applicationValue(node.right, local)
         if (node.right.type === 'Identifier' && value?.direct === 'low-level')
           effects(node.right, value, node.right.name)
-        const previous = applicationValue(node.left, local)
-        bind(node.left, value ?? (previous ? unknownValue : undefined), local)
+        assign(node.left, value, local)
         return
       }
       if (node.type === 'MemberExpression') {

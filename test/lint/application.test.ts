@@ -393,6 +393,98 @@ test('hoists var declarations and preserves the outer client across switch cases
   expect(result.coverage.gaps).toEqual([])
 })
 
+test('preserves ordered object spreads and skips defaults for supplied values', async () => {
+  await write(
+    'app/spreads.ts',
+    [
+      "import { ZenStackClient } from '@zenstackhq/orm'",
+      'const known = new ZenStackClient(schema, options)',
+      'const box = { db: {}, ...{ db: known } }',
+      "box.db.$queryRawUnsafe('select 1')",
+      'let db = known',
+      'const [n = (db = {})] = [1]',
+      "db.$queryRawUnsafe('select 2')",
+      'const uncertain = { db: known, ...unknownFields }',
+      "uncertain.db.$queryRawUnsafe('select 3')",
+      'const restored = { ...unknownFields, db: known }',
+      "restored.db.$queryRawUnsafe('select 4')",
+    ].join('\n'),
+  )
+  const result = await lint()
+  expect(result.diagnostics.map(({ ruleId, source }) => [ruleId, source?.line])).toEqual(
+    [4, 7, 11].map((line) => [prefix + 'no-raw', line]),
+  )
+  expect(result.coverage.gaps.map(({ source }) => source?.line)).toEqual([9])
+})
+
+test('reports computed queries when a tracked client becomes unresolved', async () => {
+  await write(
+    'app/unresolved.ts',
+    [
+      "import { ZenStackClient } from '@zenstackhq/orm'",
+      'let db = new ZenStackClient(schema, options)',
+      'db = unknownClient()',
+      'const { [key]: run } = db',
+      "run('select 1')",
+      'const unrelated = { name: 1 }',
+      'unrelated[key]',
+    ].join('\n'),
+  )
+  const result = await lint()
+  expect(result.diagnostics).toEqual([])
+  expect(result.coverage.gaps.map(({ source }) => source?.line)).toEqual([4])
+})
+
+test('accounts for direct switch entry and iteration assignment', async () => {
+  await write(
+    'app/control.ts',
+    [
+      "import { ZenStackClient } from '@zenstackhq/orm'",
+      'const known = new ZenStackClient(schema, options)',
+      'let db = known',
+      'switch (flag) {',
+      '  case 0: db = {}; break',
+      "  case 1: db.$queryRawUnsafe('select 1'); break",
+      '}',
+      'var connection = known',
+      'const fixture = { $queryRawUnsafe() {} }',
+      "for (var connection of [fixture]) connection.$queryRawUnsafe('not a database call')",
+    ].join('\n'),
+  )
+  const result = await lint()
+  expect(result.diagnostics.map(({ ruleId, source }) => [ruleId, source?.line])).toEqual([
+    [prefix + 'no-raw', 6],
+  ])
+  expect(result.coverage.gaps).toEqual([])
+})
+
+test('preserves provenance across definite and uncertain bindings', async () => {
+  await write(
+    'app/bindings.ts',
+    [
+      "import { ZenStackClient } from '@zenstackhq/orm'",
+      'const known = new ZenStackClient(schema, options)',
+      'const [db = known] = []',
+      "db.$queryRawUnsafe('select 1')",
+      'const [maybe = known] = unknownTuple',
+      "maybe.$queryRawUnsafe('select 2')",
+      'const box = { db: known, ...undefined, [key]: {} }',
+      "box.db.$queryRawUnsafe('select 3')",
+      'const { [key]: unresolved } = maybe',
+      'const rest = [...[known]]',
+      "for (const db of rest) db.$queryRawUnsafe('select 4')",
+      "for (const db of [known, {}]) db.$queryRawUnsafe('select 5')",
+      "for (const db of [{}, {}]) db.$queryRawUnsafe('not a database call')",
+      "for (const db in { known }) db.$queryRawUnsafe('not a database call')",
+    ].join('\n'),
+  )
+  const result = await lint()
+  expect(result.diagnostics.map(({ ruleId, source }) => [ruleId, source?.line])).toEqual([
+    [prefix + 'no-raw', 4],
+  ])
+  expect(result.coverage.gaps.map(({ source }) => source?.line)).toEqual([6, 8, 9, 11, 12])
+})
+
 test('validates source input and query options before scanning', async () => {
   await expect(lint({ source: [''] })).rejects.toThrow('lint.source')
   await expect(
