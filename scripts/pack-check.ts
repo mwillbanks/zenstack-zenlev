@@ -174,7 +174,38 @@ const result: LintResult = await lintProject({
 assert.equal(result.status, 'failed')
 assert.deepEqual(result.coverage.gaps, [])
 assert(result.diagnostics.some(({ ruleId }) => ruleId === 'zenlev/naming/table-case'))
+const zenstack = await lintProject({
+  cwd: import.meta.dir,
+  lint: { migrations: false, source: ['queries/zenstack.js'] },
+})
+assert.deepEqual(zenstack.coverage.gaps, [])
+assert.deepEqual(zenstack.diagnostics.map(({ ruleId }) => ruleId), [
+  'zenlev/queries/no-direct-kysely',
+  'zenlev/queries/no-raw',
+])
+const standalone = await lintProject({
+  cwd: import.meta.dir,
+  lint: { zmodel: false, migrations: false, source: ['queries/kysely.js'] },
+})
+assert.equal(standalone.status, 'ok')
+assert.equal(standalone.files, 1)
+assert.deepEqual(standalone.coverage.gaps, [])
 `,
+    'queries/zenstack.js': [
+      "import { ZenStackClient } from '@zenstackhq/orm'",
+      "import { sql } from 'kysely'",
+      "throw new Error('Offline lint must not import this module')",
+      'const db = new ZenStackClient(schema, options)',
+      'db.item.findMany()',
+      "db.$qb.selectFrom('Item').selectAll()",
+      'const physical = db.$qbRaw',
+      'sql.raw(unknownSql)',
+    ].join('\n'),
+    'queries/kysely.js': [
+      "import { Kysely } from 'kysely'",
+      'const db = new Kysely(options)',
+      "db.selectFrom('Item').selectAll()",
+    ].join('\n'),
     'db.ts':
       "import { Database, type SQLQueryBindings } from 'bun:sqlite'\nimport { ZenStackClient } from '@zenstackhq/orm'\nimport { SqliteDialect } from 'kysely'\nimport { resolve } from 'node:path'\n\nconst schema = {\n  provider: { type: 'sqlite' },\n  plugins: {},\n  models: {\n    Item: {\n      name: 'Item',\n      fields: {\n        id: { name: 'id', type: 'Int', id: true },\n        value: { name: 'value', type: 'String' },\n      },\n      idFields: ['id'],\n      uniqueFields: { id: { type: 'Int' } },\n    },\n  },\n} as const\n\nexport function createClient() {\n  const database = new Database(resolve(import.meta.dir, 'consumer.sqlite'))\n  const client = new ZenStackClient(schema, {\n    dialect: new SqliteDialect({\n      database: {\n        close: () => database.close(),\n        prepare(sql) {\n          const statement = database.prepare(sql)\n          return {\n            reader: statement.columnNames.length > 0,\n            all: (parameters) => statement.all(...(parameters as SQLQueryBindings[])),\n            run: (parameters) => statement.run(...(parameters as SQLQueryBindings[])),\n            iterate: (parameters) => statement.iterate(...(parameters as SQLQueryBindings[])),\n          }\n        },\n      },\n    }),\n  })\n  return { client, dispose: () => client.$disconnect() }\n}\n",
     'zenlev.config.ts':

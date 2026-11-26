@@ -1,0 +1,28 @@
+---
+title: Zenlev 0.4.0
+description: Enforce typed application query styles and reject low-level access or raw SQL outside migrations.
+---
+
+Zenlev 0.4.0 adds application query policy to offline lint. Existing projects keep their current scan scope until they configure `lint.source`.
+
+## Select application files
+
+Set `lint.source` to TypeScript and JavaScript globs relative to the effective project directory.
+
+```ts
+lint: {
+  source: ['src/**/*.{ts,tsx,js,jsx}'],
+}
+```
+
+The recommended preset permits query-builder and query-API styles. It rejects direct low-level access and raw SQL in selected application files. Standalone Kysely projects retain typed builder access. Enable `zenlev/queries/no-schema-changes` to require schema changes through migrations.
+
+Discovered migrations remain exempt from application query rules, even when migration source lint is disabled. Existing migration SQL, configured SQL files, live catalogs, and write-plan checks retain their behavior.
+
+## Review coverage and exceptions
+
+Application scanning does not import application modules or acquire a client. It follows supported static source forms and reports coverage gaps for unresolved behavior. A passing scan does not prove that arbitrary dynamic wrappers enforce policy.
+
+Use file overrides for reviewed exceptions. Run `zenlev lint --max-warnings 0` in CI when all coverage gaps require review. The bundled linting skill includes application policy setup and remediation guidance.
+
+[Configure application linting](./guides/linting#check-application-queries) and [review rule options](./reference/lint-rules#application-query-rules).

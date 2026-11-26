@@ -1,6 +1,6 @@
 ---
 title: 'Database linting'
-description: 'Check ZModel, migration SQL, and deployed database objects against configurable policy.'
+description: 'Check ZModel, application queries, migration SQL, and deployed objects against configurable policy.'
 ---
 
 Run database linting before you submit schema or migration changes. Zenlev ships the linter in the same package as the migration commands.
@@ -11,7 +11,7 @@ bun run zenlev lint --max-warnings 0 --json
 bun run zenstack-zenlev lint
 ```
 
-The offline command reads ZModel, migration source, and configured SQL files. It loads project configuration and lint rule plugins. It skips database acquisition, client-module loading, migration plugin initialization, and migration module imports.
+The offline command reads ZModel, migration source, configured SQL files, and application files selected by `lint.source`. It loads project configuration and lint rule plugins. It skips database acquisition, client-module loading, migration plugin initialization, and migration module imports.
 
 TypeScript configuration and lint rule plugins execute as trusted project code. Keep their module-level code free of external effects.
 
@@ -54,6 +54,52 @@ export default defineConfig({
 ```
 
 This rule permits cleanup drops while rejecting new routines. Use `presets: []` to start with an explicit rule set. The built-in `naming`, `objects`, and `access` presets provide opt-in policy groups.
+
+## Check application queries
+
+Set `lint.source` to application TypeScript and JavaScript globs relative to the effective project directory. Application scanning is opt-in. The recommended preset enables three query rules for selected files.
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    source: ['src/**/*.{ts,tsx,js,jsx}'],
+    rules: {
+      'zenlev/queries/allowed-types': ['error', { allow: ['query-builder', 'query-api'] }],
+      'zenlev/queries/no-direct-kysely': ['error', { mode: 'auto' }],
+      'zenlev/queries/no-raw': 'error',
+      'zenlev/queries/no-schema-changes': 'error',
+    },
+  },
+})
+```
+
+`allowed-types` permits ZenStack's `$qb` query builder and model delegate query API by default. Restrict `allow` to either form when the application requires one style. Raw SQL and low-level client access have separate rules.
+
+`no-direct-kysely` rejects `$qbRaw`, including extracting it without calling it. In ZenStack mode, it also rejects constructing or using a separate Kysely query client. Type-only imports and dialect setup remain valid. Auto mode uses available project configuration to distinguish ZenStack and standalone Kysely. Set `mode: 'zenstack'` or `mode: 'standalone'` when configuration cannot establish the intended convention. Standalone mode permits typed Kysely queries, but never exempts `$qbRaw`.
+
+`no-raw` rejects recognized raw execution APIs, Kysely `sql` templates and raw fragments, and driver calls that accept SQL text. Bound parameters do not exempt raw SQL. Executing SQL loaded from a file remains a raw query.
+
+The optional `no-schema-changes` rule rejects application-side schema builders. Put schema changes in migrations instead.
+
+Discovered migrations are exempt from application query rules, even when `lint.migrations: false`. Existing migration, configured SQL, live catalog, and write-plan checks retain their behavior. Application scanning runs offline without importing application modules or acquiring a client. It does not add application scanning to `lintPlugin()` or `lint --live`.
+
+The Oxc analysis follows statically traceable aliases, destructuring, bracket access, and transaction clients. Unrelated methods with matching names do not establish a database operation. Dynamic wrappers can leave coverage gaps. Review those gaps before claiming compliance.
+
+Use existing `lint.overrides` to scope exceptions by file. For example, a reviewed maintenance command can disable one rule without disabling application checks elsewhere.
+
+```ts
+lint: {
+  source: ['src/**/*.{ts,tsx,js,jsx}'],
+  overrides: [
+    {
+      files: ['src/maintenance/rebuild.ts'],
+      rules: { 'zenlev/queries/no-schema-changes': 'off' },
+    },
+  ],
+}
+```
 
 ## Configure a standalone Kysely project
 

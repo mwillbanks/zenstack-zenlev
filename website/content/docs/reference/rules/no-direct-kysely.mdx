@@ -1,0 +1,40 @@
+---
+title: 'No direct Kysely access'
+description: 'Keep application queries on the approved client boundary.'
+---
+
+Checks application files selected by `lint.source`. The recommended preset enables this rule at `error`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    source: ['src/**/*.{ts,tsx,js,jsx}'],
+    rules: {
+      'zenlev/queries/no-direct-kysely': ['error', { mode: 'auto' }],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `mode` accepts `auto`, `zenstack`, or `standalone`. The default is `auto`.
+- `auto` uses available project configuration to distinguish ZenStack and standalone Kysely conventions.
+- `zenstack` rejects constructing or using a separate Kysely query client outside the ZenStack boundary.
+- `standalone` permits typed Kysely queries in applications built directly on Kysely.
+
+Auto selects ZenStack when ZModel provides a datasource or the project specifies a schema. Otherwise, it recognizes a supplied ZenStack or Kysely client. With no recognized client, `lint.zmodel: false` selects standalone mode; other configurations select ZenStack. Offline lint does not load client modules or call factories to determine this mode.
+
+Every mode rejects ZenStack `$qbRaw`, including extraction without a call. Type-only imports and dialect setup remain valid. Use an explicit mode when configuration cannot identify the intended convention.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors). Use file overrides for reviewed exceptions.
+
+## Example
+
+`const lowLevel = db.$qbRaw` violates the rule on a recognized ZenStack client. Use `db.$qb` or a permitted model delegate instead. This rule does not prohibit Zenlev's own migration connection adapters.
+
+Discovered migrations remain exempt, even when `lint.migrations: false`. Review unresolved dynamic source coverage gaps before claiming compliance.

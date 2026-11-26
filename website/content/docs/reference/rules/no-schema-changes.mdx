@@ -1,0 +1,33 @@
+---
+title: 'No application schema changes'
+description: 'Require application schema changes to use migrations.'
+---
+
+Checks application files selected by `lint.source`. This opt-in rule is off by default.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    source: ['src/**/*.{ts,tsx,js,jsx}'],
+    rules: {
+      'zenlev/queries/no-schema-changes': 'error',
+    },
+  },
+})
+```
+
+## Parameters
+
+The rule has only shared selectors.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors). Use file overrides for reviewed exceptions.
+
+## Example
+
+`db.$qb.schema.createTable('example')` violates the rule on a recognized ZenStack client. Put the schema change in a migration instead. Typed schema builders remain schema changes even without raw SQL. Existing migration schema and write-plan rules retain their behavior.
+
+Discovered migrations remain exempt, even when `lint.migrations: false`. Review unresolved dynamic source coverage gaps before claiming compliance.

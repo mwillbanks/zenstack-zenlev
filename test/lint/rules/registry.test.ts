@@ -4,12 +4,12 @@ import Schema from 'typebox/schema'
 import { builtinPresets, builtinRules, recommendedLintConfig } from '../../../src/lint/rules'
 import { inspect, table } from './fixtures'
 
-test('recommended preset exposes six documented defaults and optional families', () => {
-  expect(Object.keys(recommendedLintConfig.rules!)).toHaveLength(6)
-  expect(Object.values(recommendedLintConfig.rules!)).toEqual(Array(6).fill('error'))
+test('recommended preset exposes nine documented defaults and optional families', () => {
+  expect(Object.keys(recommendedLintConfig.rules!)).toHaveLength(9)
+  expect(Object.values(recommendedLintConfig.rules!)).toEqual(Array(9).fill('error'))
   expect(builtinPresets.recommended).toBe(recommendedLintConfig)
   expect(Object.keys(builtinPresets)).toEqual(['recommended', 'naming', 'objects', 'access'])
-  expect(Object.keys(builtinRules)).toHaveLength(20)
+  expect(Object.keys(builtinRules)).toHaveLength(24)
 })
 
 test('documents every built-in rule once and lists every page in navigation', async () => {

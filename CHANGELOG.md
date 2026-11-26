@@ -8,6 +8,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0) and
 
 ### Added
 
+- Check selected application TypeScript and JavaScript for allowed query styles, direct Kysely access, raw SQL, and optional schema changes. Keep migrations exempt from application policy.
 - Ship offline and live database linting with recommended ZModel mapping and primary-key rules, configurable conventions, and lint rule plugins.
 - Add `lintPlugin()` and a final-plan write hook that can reject migration apply and schema push before user SQL executes.
 - Document lint adoption, catalog capabilities, rule configuration, custom plugins, and reviewed exceptions.

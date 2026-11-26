@@ -1,0 +1,37 @@
+---
+title: 'Allowed query types'
+description: 'Require approved typed query styles in application source.'
+---
+
+Checks application files selected by `lint.source`. The recommended preset enables this rule at `error`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    source: ['src/**/*.{ts,tsx,js,jsx}'],
+    rules: {
+      'zenlev/queries/allowed-types': ['error', { allow: ['query-builder', 'query-api'] }],
+    },
+  },
+})
+```
+
+## Parameters
+
+- `allow` accepts `query-builder` and `query-api`. Both are allowed by default.
+- `query-builder` covers ZenStack `$qb` and typed standalone Kysely builders.
+- `query-api` covers ZenStack model delegates, such as `db.user.findMany()`.
+
+Raw SQL and low-level access have separate rules. Allowing a query style does not exempt those operations.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors). Use file overrides for reviewed exceptions.
+
+## Example
+
+Set `allow: ['query-api']` to permit `db.user.findMany()` and reject `db.$qb.selectFrom('user')` on a recognized ZenStack client.
+
+Discovered migrations remain exempt, even when `lint.migrations: false`. Review unresolved dynamic source coverage gaps before claiming compliance.

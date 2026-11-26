@@ -1,0 +1,561 @@
+import { createHash } from 'node:crypto'
+import { dirname, resolve } from 'node:path'
+import { parseSync, visitorKeys, type Node, type Program } from 'oxc-parser'
+import type { LintGap, LintInput, LintNode, LintSource } from '../types'
+import { sourceAt } from './tokens'
+import {
+  applicationDatabaseValue,
+  applicationIterationValue,
+  applicationMember,
+  applicationName,
+  applicationProperty,
+  applicationValue,
+  bindApplicationValue,
+  knownApplicationModule,
+  unknownValue,
+  uncertainApplicationValue,
+  unresolvedQueryMember,
+  type ApplicationScope,
+  type ApplicationValue,
+} from './application-values'
+
+function children(node: Node): Node[] {
+  const fields = node as unknown as Record<string, Node | Node[] | null>
+  const result: Node[] = []
+  for (const key of visitorKeys[node.type] ?? []) {
+    const child = fields[key]
+    if (Array.isArray(child)) result.push(...child.filter((value): value is Node => value != null))
+    else if (child) result.push(child)
+  }
+  return result
+}
+
+function declarations(statement: Node): readonly Node[] {
+  if (statement.type === 'ExportNamedDeclaration')
+    return statement.declaration ? declarations(statement.declaration) : []
+  if (statement.type === 'VariableDeclaration') return statement.declarations.map(({ id }) => id)
+  if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration')
+    return statement.id ? [statement.id] : []
+  return []
+}
+
+function predeclare(body: readonly Node[], scope: ApplicationScope, hoisted = false): void {
+  for (const statement of body) {
+    const declaration =
+      statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type === 'VariableDeclaration' && declaration.kind === 'var' && !hoisted)
+      continue
+    for (const id of declarations(statement)) bindApplicationValue(id, undefined, scope)
+  }
+  for (const statement of body) {
+    const declaration =
+      statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type !== 'VariableDeclaration' || (declaration.kind === 'var' && !hoisted))
+      continue
+    for (const binding of declaration.declarations) {
+      const candidates = new Map(scope)
+      bindApplicationValue(binding.id, applicationValue(binding.init, scope), candidates)
+      for (const [name, value] of candidates)
+        if (
+          value !== scope.get(name) &&
+          (applicationDatabaseValue(value) || value?.kind === 'unknown')
+        )
+          scope.set(name, uncertainApplicationValue(value))
+    }
+  }
+}
+
+function hoistedDeclarations(node: Node): Node[] {
+  if (
+    [
+      'FunctionDeclaration',
+      'FunctionExpression',
+      'ArrowFunctionExpression',
+      'ClassDeclaration',
+      'ClassExpression',
+    ].includes(node.type)
+  )
+    return []
+  if (node.type === 'VariableDeclaration' && node.kind === 'var') return [node]
+  return children(node).flatMap(hoistedDeclarations)
+}
+
+function mergeAssignments(
+  scope: ApplicationScope,
+  evaluated: ApplicationScope,
+  uncertain: boolean,
+  shadowed?: ApplicationScope,
+): void {
+  for (const [name, previous] of scope) {
+    const value = evaluated.get(name)
+    if (!shadowed?.has(name) && value !== previous)
+      scope.set(name, uncertain ? uncertainApplicationValue(previous, value) : value)
+  }
+}
+
+function caseExit(node: Node): boolean {
+  if (
+    ['BreakStatement', 'ContinueStatement', 'ReturnStatement', 'ThrowStatement'].includes(node.type)
+  )
+    return true
+  return node.type === 'BlockStatement' && node.body.some(caseExit)
+}
+
+interface ParsedApplicationModule {
+  readonly program: Program
+  readonly text: string
+  readonly fingerprint: string
+  readonly errors: readonly { readonly message: string }[]
+}
+
+interface ApplicationModule extends ParsedApplicationModule {
+  readonly path: string
+  readonly imports: ReadonlyMap<string, ApplicationValue>
+}
+
+type ApplicationLintReader = (
+  path: string,
+  dialect: string | undefined,
+  mode: 'zenstack' | 'standalone',
+) => Promise<LintInput>
+
+type ParsedModules = Map<string, Promise<ParsedApplicationModule>>
+
+async function readParsedModule(
+  path: string,
+  cache: ParsedModules,
+): Promise<ParsedApplicationModule> {
+  let pending = cache.get(path)
+  if (!pending) {
+    pending = (async () => {
+      const text = await Bun.file(path).text()
+      const { program, errors } = parseSync(path, text, {
+        sourceType: 'module',
+        preserveParens: false,
+      })
+      return { text, program, errors, fingerprint: createHash('sha256').update(text).digest('hex') }
+    })()
+    if (cache.size >= 64) cache.delete(cache.keys().next().value!)
+    cache.set(path, pending)
+  }
+  return pending
+}
+
+/** Share bounded parsed source snapshots within one lint invocation. */
+export function createApplicationLintReader(): ApplicationLintReader {
+  const parsed: ParsedModules = new Map()
+  return (path, dialect, mode) => readApplication(path, dialect, mode, parsed)
+}
+
+async function readApplication(
+  path: string,
+  dialect: string | undefined,
+  mode: 'zenstack' | 'standalone',
+  parsed: ParsedModules,
+): Promise<LintInput> {
+  const modules = new Map<string, ApplicationValue>()
+  const input: { nodes: LintNode[]; gaps: LintGap[] } = { nodes: [], gaps: [] }
+
+  async function readModule(
+    filePath: string,
+    parents: ReadonlySet<string>,
+    primary: boolean,
+  ): Promise<ApplicationModule | undefined> {
+    let source: ParsedApplicationModule
+    try {
+      source = await readParsedModule(filePath, parsed)
+    } catch (error) {
+      if (primary) throw error
+      return
+    }
+    const { program, errors } = source
+    if (errors.length) {
+      if (!primary) return
+      throw new SyntaxError(
+        'Invalid application source: ' + errors.map((error) => error.message).join('\n'),
+      )
+    }
+    const imports = new Map<string, ApplicationValue>()
+    for (const statement of program.body) {
+      if (
+        statement.type !== 'ImportDeclaration' &&
+        statement.type !== 'ExportAllDeclaration' &&
+        statement.type !== 'ExportNamedDeclaration'
+      )
+        continue
+      if (!statement.source) continue
+      const specifier = statement.source.value
+      let module = knownApplicationModule(specifier)
+      if (!module && specifier.startsWith('.')) {
+        let target: string | undefined
+        try {
+          target = Bun.resolveSync(specifier, dirname(filePath))
+        } catch {
+          /* Unresolved provenance is reported at query use. */
+        }
+        if (target && !parents.has(target) && parents.size < 12 && modules.size < 64) {
+          module = modules.get(target)
+          if (!module) {
+            modules.set(target, unknownValue)
+            const dependency = await readModule(target, new Set([...parents, target]), false)
+            module = dependency ? inspect(dependency, false) : unknownValue
+            modules.set(target, module)
+          }
+        }
+      }
+      imports.set(specifier, module ?? unknownValue)
+    }
+    return { ...source, path: filePath, imports }
+  }
+
+  function inspect(module: ApplicationModule, primary: boolean): ApplicationValue {
+    const scope: ApplicationScope = new Map()
+    const exports = new Map<string, ApplicationValue>()
+    const fingerprint = module.fingerprint
+    const base: LintSource = { path: module.path, line: 1, column: 1, fingerprint }
+    const location = (node: Node) => sourceAt(base, module.text, node.start, node.end)
+    const seen = new Set<string>()
+    function emit(node: Node, type: string, name: string, command?: string): void {
+      if (!primary) return
+      const end = type === 'direct-kysely' && command === 'low-level' ? '' : node.end
+      const key = node.start + ':' + end + ':' + type
+      if (seen.has(key)) return
+      seen.add(key)
+      input.nodes.push({
+        kind: 'application-query',
+        name,
+        type,
+        command,
+        dialect,
+        origin: 'application',
+        action: 'call',
+        source: location(node),
+        identity: name,
+      })
+    }
+    function gap(node: Node, message: string): void {
+      if (primary) input.gaps.push({ message, source: location(node) })
+    }
+    function effects(node: Node, value: ApplicationValue | undefined, name: string): void {
+      if (value?.query) emit(node, value.query, name)
+      if (
+        value?.direct &&
+        (value.direct === 'low-level' ||
+          value.query === 'query-builder' ||
+          node.type === 'NewExpression')
+      )
+        emit(node, 'direct-kysely', name, value.direct === 'low-level' ? 'low-level' : mode)
+    }
+    function propertyEffects(
+      node: Node,
+      object: ApplicationValue | undefined,
+      name: string | undefined,
+    ): void {
+      if (name !== undefined) {
+        effects(node, applicationProperty(object, name), name)
+        if (object?.kind === 'unknown' && unresolvedQueryMember(name))
+          gap(
+            node,
+            'Query client provenance cannot be resolved statically; review this application query.',
+          )
+      } else if (applicationDatabaseValue(object))
+        gap(node, 'Dynamic database member access requires manual review.')
+    }
+    function bind(
+      pattern: Node,
+      value: ApplicationValue | undefined,
+      local: ApplicationScope,
+    ): void {
+      bindApplicationValue(pattern, value, local, {
+        expression: (node, uncertain) => {
+          if (!uncertain) visit(node, local)
+          else {
+            const branch = new Map(local)
+            visit(node, branch)
+            mergeAssignments(local, branch, true)
+          }
+        },
+        property: propertyEffects,
+      })
+    }
+    function assign(
+      pattern: Node,
+      value: ApplicationValue | undefined,
+      local: ApplicationScope,
+    ): void {
+      const previous = applicationValue(pattern, local)
+      let assigned = value
+      if ((!value || value.kind === 'unknown') && previous)
+        assigned = uncertainApplicationValue(previous, value)
+      bind(pattern, assigned, local)
+    }
+    function visitFunction(
+      node: Node,
+      parent: ApplicationScope,
+      transaction?: ApplicationValue,
+    ): void {
+      if (
+        node.type !== 'ArrowFunctionExpression' &&
+        node.type !== 'FunctionExpression' &&
+        node.type !== 'FunctionDeclaration'
+      )
+        return
+      const local = new Map(parent)
+      if ('id' in node && node.id) local.set(node.id.name, undefined)
+      const parameters: ApplicationScope = new Map()
+      for (const parameter of node.params) {
+        bindApplicationValue(parameter, undefined, local)
+        bindApplicationValue(parameter, undefined, parameters)
+      }
+      for (const [index, parameter] of node.params.entries())
+        bind(parameter, index === 0 ? transaction : undefined, local)
+      if (node.body) {
+        const body = new Map(local)
+        predeclare(hoistedDeclarations(node.body), body, true)
+        for (const name of parameters.keys()) body.set(name, local.get(name))
+        visit(node.body, body)
+      }
+    }
+    function visit(node: Node, local: ApplicationScope): void {
+      if (
+        node.type.startsWith('TS') &&
+        ![
+          'TSAsExpression',
+          'TSSatisfiesExpression',
+          'TSNonNullExpression',
+          'TSTypeAssertion',
+        ].includes(node.type)
+      )
+        return
+      if (node.type === 'ImportDeclaration') return
+      if (
+        node.type === 'ArrowFunctionExpression' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'FunctionDeclaration'
+      ) {
+        visitFunction(node, local)
+        return
+      }
+      if (node.type === 'BlockStatement') {
+        const block = new Map(local)
+        const shadowed: ApplicationScope = new Map()
+        predeclare(node.body, block)
+        predeclare(node.body, shadowed)
+        for (const statement of node.body) visit(statement, block)
+        mergeAssignments(local, block, false, shadowed)
+        return
+      }
+      if (node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
+        visit(node.test, local)
+        const consequent = new Map(local)
+        const alternate = new Map(local)
+        visit(node.consequent, consequent)
+        if (node.alternate) visit(node.alternate, alternate)
+        mergeAssignments(local, consequent, true)
+        mergeAssignments(local, alternate, true)
+        return
+      }
+      if (node.type === 'TryStatement') {
+        for (const child of children(node)) {
+          const branch = new Map(local)
+          visit(child, branch)
+          mergeAssignments(local, branch, true)
+        }
+        return
+      }
+      if (node.type === 'CatchClause') {
+        const caught = new Map(local)
+        if (node.param) bindApplicationValue(node.param, undefined, caught)
+        visit(node.body, caught)
+        const shadowed: ApplicationScope = new Map()
+        if (node.param) bindApplicationValue(node.param, undefined, shadowed)
+        mergeAssignments(local, caught, true, shadowed)
+        return
+      }
+      if (node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
+        const loop = new Map(local)
+        const shadowed: ApplicationScope = new Map()
+        if (node.left.type === 'VariableDeclaration') {
+          predeclare([node.left], loop)
+          predeclare([node.left], shadowed)
+        }
+        visit(node.right, loop)
+        const iterable = applicationValue(node.right, loop)
+        if (!(
+          node.type === 'ForOfStatement' &&
+          iterable?.iterable &&
+          iterable.complete &&
+          iterable.members?.size === 0
+        )) {
+          const value = applicationIterationValue(iterable, node.type === 'ForInStatement')
+          if (node.left.type === 'VariableDeclaration')
+            for (const declaration of node.left.declarations) assign(declaration.id, value, loop)
+          else assign(node.left, value, loop)
+          visit(node.body, loop)
+        }
+        mergeAssignments(local, loop, true, shadowed)
+        return
+      }
+      if (
+        node.type === 'ForStatement' ||
+        node.type === 'WhileStatement' ||
+        node.type === 'DoWhileStatement'
+      ) {
+        const loop = new Map(local)
+        const shadowed: ApplicationScope = new Map()
+        const declaration = node.type === 'ForStatement' ? node.init : undefined
+        if (declaration?.type === 'VariableDeclaration') {
+          predeclare([declaration], loop)
+          predeclare([declaration], shadowed)
+        }
+        for (const child of children(node)) visit(child, loop)
+        mergeAssignments(local, loop, true, shadowed)
+        return
+      }
+      if (node.type === 'SwitchStatement') {
+        visit(node.discriminant, local)
+        const base = new Map(local)
+        const shadowed: ApplicationScope = new Map()
+        const statements = node.cases.flatMap((entry) => entry.consequent)
+        predeclare(statements, base)
+        predeclare(statements, shadowed)
+        let fallthrough: ApplicationScope | undefined
+        for (const entry of node.cases) {
+          const branch = new Map(base)
+          if (fallthrough) mergeAssignments(branch, fallthrough, true)
+          if (entry.test) visit(entry.test, branch)
+          for (const statement of entry.consequent) visit(statement, branch)
+          mergeAssignments(local, branch, true, shadowed)
+          fallthrough = entry.consequent.some(caseExit) ? undefined : branch
+        }
+        return
+      }
+      if (node.type === 'VariableDeclaration') {
+        for (const declaration of node.declarations)
+          if (node.kind !== 'var' || declaration.init) visit(declaration, local)
+        return
+      }
+      if (node.type === 'VariableDeclarator') {
+        if (node.init) visit(node.init, local)
+        const value = applicationValue(node.init, local)
+        if (node.init?.type === 'Identifier' && value?.direct === 'low-level')
+          effects(node.init, value, node.init.name)
+        bind(node.id, value, local)
+        return
+      }
+      if (node.type === 'AssignmentExpression') {
+        visit(node.right, local)
+        const value = applicationValue(node.right, local)
+        if (node.right.type === 'Identifier' && value?.direct === 'low-level')
+          effects(node.right, value, node.right.name)
+        assign(node.left, value, local)
+        return
+      }
+      if (node.type === 'MemberExpression') {
+        visit(node.object, local)
+        const object = applicationValue(node.object, local)
+        const name = applicationMember(node)
+        propertyEffects(node, object, name)
+        if (node.computed) visit(node.property, local)
+        return
+      }
+      if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+        visit(node.callee, local)
+        const callee = applicationValue(node.callee, local)
+        if (
+          node.type === 'CallExpression' &&
+          node.callee.type === 'MemberExpression' &&
+          applicationMember(node.callee) === 'executeQuery' &&
+          applicationValue(node.callee.object, local)?.kind === 'builder'
+        ) {
+          const argument = node.arguments[0]
+          const value = applicationValue(argument, local)
+          if (argument?.type === 'ObjectExpression') emit(node, 'raw', 'executeQuery')
+          else if (value?.kind !== 'builder' && value?.kind !== 'sql')
+            gap(node, 'Compiled query provenance requires manual review.')
+        }
+        if (node.type === 'NewExpression')
+          effects(node, callee?.result, applicationName(node.callee) ?? 'constructor')
+        if (node.callee.type !== 'MemberExpression' && callee?.query)
+          effects(node, callee, applicationName(node.callee) ?? 'query')
+        for (const argument of node.arguments) {
+          if (
+            callee?.transaction &&
+            (argument.type === 'ArrowFunctionExpression' || argument.type === 'FunctionExpression')
+          )
+            visitFunction(argument, local, callee.result)
+          else {
+            const argumentValue = applicationValue(argument, local)
+            if (
+              (!callee || callee.kind === 'unknown') &&
+              argumentValue &&
+              ['client', 'builder', 'delegate', 'driver', 'sql', 'schema'].includes(
+                argumentValue.kind,
+              )
+            )
+              gap(argument, 'Database value passed to an unresolved helper requires manual review.')
+            visit(argument, local)
+          }
+        }
+        return
+      }
+      if (node.type === 'TaggedTemplateExpression') {
+        visit(node.tag, local)
+        const tag = applicationValue(node.tag, local)
+        if (tag?.kind === 'sql') emit(node, 'raw', 'sql')
+        for (const expression of node.quasi.expressions) visit(expression, local)
+        return
+      }
+      if (node.type === 'ImportExpression')
+        gap(node, 'Dynamic application imports require manual review of query provenance.')
+      for (const child of children(node)) visit(child, local)
+    }
+    for (const statement of module.program.body) {
+      if (statement.type !== 'ImportDeclaration') continue
+      const imported = module.imports.get(statement.source.value)
+      for (const binding of statement.specifiers) {
+        const name =
+          binding.type === 'ImportNamespaceSpecifier'
+            ? undefined
+            : binding.type === 'ImportDefaultSpecifier'
+              ? 'default'
+              : applicationName(binding.imported)
+        const value = name === undefined ? imported : applicationProperty(imported, name)
+        scope.set(binding.local.name, value)
+      }
+    }
+    predeclare(hoistedDeclarations(module.program), scope, true)
+    predeclare(module.program.body, scope)
+    for (const statement of module.program.body) visit(statement, scope)
+    for (const statement of module.program.body) {
+      if (statement.type === 'ExportDefaultDeclaration') {
+        exports.set('default', applicationValue(statement.declaration, scope) ?? unknownValue)
+      } else if (statement.type === 'ExportAllDeclaration') {
+        const imported = module.imports.get(statement.source.value)
+        for (const [name, value] of imported?.members ?? [])
+          if (name !== 'default') exports.set(name, value)
+      } else if (statement.type === 'ExportNamedDeclaration') {
+        for (const declaration of declarations(statement))
+          if (declaration.type === 'Identifier')
+            exports.set(declaration.name, scope.get(declaration.name) ?? unknownValue)
+        const imported = statement.source && module.imports.get(statement.source.value)
+        for (const binding of statement.specifiers) {
+          const name = applicationName(binding.exported)
+          const localName = applicationName(binding.local)
+          if (name && localName)
+            exports.set(
+              name,
+              (imported ? applicationProperty(imported, localName) : scope.get(localName)) ??
+                unknownValue,
+            )
+        }
+      }
+    }
+    return { kind: 'module', members: exports }
+  }
+
+  const absolutePath = resolve(path)
+  const module = await readModule(absolutePath, new Set([absolutePath]), true)
+  if (module) inspect(module, true)
+  return { ...input, capabilities: ['application-source'] }
+}

@@ -5,6 +5,7 @@ import { columnsRules } from './rules/columns'
 import { objectsRules } from './rules/objects'
 import { rlsRules } from './rules/rls'
 import { policiesRules } from './rules/policies'
+import { queryRules } from './rules/queries'
 import type { LintConfig, LintRule } from './types'
 
 export const builtinRules: Readonly<Record<string, LintRule>> = {
@@ -15,6 +16,7 @@ export const builtinRules: Readonly<Record<string, LintRule>> = {
   ...objectsRules,
   ...rlsRules,
   ...policiesRules,
+  ...queryRules,
 }
 
 export const recommendedLintConfig: LintConfig = {
@@ -25,6 +27,9 @@ export const recommendedLintConfig: LintConfig = {
     'zenlev/naming/column-case': 'error',
     'zenlev/keys/primary-name': 'error',
     'zenlev/keys/no-sequential': 'error',
+    'zenlev/queries/allowed-types': 'error',
+    'zenlev/queries/no-direct-kysely': 'error',
+    'zenlev/queries/no-raw': 'error',
   },
 }
 
