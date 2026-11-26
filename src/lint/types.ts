@@ -24,7 +24,7 @@ export interface LintNode {
   readonly table?: string | undefined
   readonly identity?: string | undefined
   readonly source?: LintSource | undefined
-  readonly origin: 'zmodel' | 'sql' | 'migration' | 'catalog'
+  readonly origin: 'zmodel' | 'sql' | 'migration' | 'catalog' | 'application'
   readonly action?:
     | undefined
     | 'create'
@@ -154,6 +154,7 @@ export interface LintConfig {
   readonly zmodel?: boolean
   readonly migrations?: boolean
   readonly sql?: readonly string[]
+  readonly source?: readonly string[]
   readonly namespaces?: readonly string[]
   readonly overrides?: readonly LintOverride[]
   readonly plugins?: readonly LintPluginSpecifier[]

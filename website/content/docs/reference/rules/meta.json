@@ -20,6 +20,10 @@
     "restricted-objects",
     "object-security",
     "postgres-rls",
-    "zenstack-policies"
+    "zenstack-policies",
+    "allowed-query-types",
+    "no-direct-kysely",
+    "no-raw-queries",
+    "no-schema-changes"
   ]
 }

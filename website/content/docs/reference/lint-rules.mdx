@@ -7,7 +7,7 @@ Use complete rule IDs under `lint.rules`. Each setting accepts `off`, `warn`, `e
 
 ## Shared selectors
 
-All built-in rule options accept `include`, `exclude`, and `kinds` selectors. Include and exclude patterns match qualified object identities with `*` wildcards. Use `lint.overrides` for file globs, dialects, origins, kinds, and identity globs.
+All built-in rule options accept `include`, `exclude`, and `kinds` selectors. Include and exclude patterns match qualified object identities with `*` wildcards. Use `lint.overrides` for file globs, dialects, origins, kinds, and identity globs. Application query evidence uses the `application` origin and `application-query` kind. Use file overrides to scope application policy.
 
 ## Recommended rules
 
@@ -21,6 +21,19 @@ All built-in rule options accept `include`, `exclude`, and `kinds` selectors. In
 | [`zenlev/keys/no-sequential`](./reference/rules/no-sequential) | `error`             | Prefer keys suitable for distributed writers |
 
 The sequential-key rule covers ZModel `autoincrement()`, PostgreSQL serial, identity, and recognized sequence defaults, MySQL `AUTO_INCREMENT`, and SQLite rowid aliases. SQLite `INTEGER PRIMARY KEY` can generate values without an `AUTOINCREMENT` keyword. `WITHOUT ROWID` and the inline `PRIMARY KEY DESC` exception have different behavior.
+
+## Application query rules
+
+Select application inputs with `lint.source`. These rules do not change migration SQL, configured SQL files, live audits, or write-plan enforcement.
+
+| Rule ID                                                                   | Default | Options                                                      |
+| ------------------------------------------------------------------------- | ------- | ------------------------------------------------------------ |
+| [`zenlev/queries/allowed-types`](./reference/rules/allowed-query-types)   | `error` | `allow: ['query-builder', 'query-api']`                      |
+| [`zenlev/queries/no-direct-kysely`](./reference/rules/no-direct-kysely)   | `error` | `mode: 'auto' \| 'zenstack' \| 'standalone'`, default `auto` |
+| [`zenlev/queries/no-raw`](./reference/rules/no-raw-queries)               | `error` | Shared selectors only                                        |
+| [`zenlev/queries/no-schema-changes`](./reference/rules/no-schema-changes) | `off`   | Shared selectors only                                        |
+
+The recommended preset enables the first three rules. Discovered migrations remain exempt, including when `lint.migrations: false`. Severity controls enablement; these rules do not add redundant Boolean options.
 
 ## Opt-in rules
 

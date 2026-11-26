@@ -38,7 +38,7 @@ export interface LintBatch extends LintInput {
 }
 
 const severity = new Set(['off', 'warn', 'error'])
-const origins = new Set(['zmodel', 'sql', 'migration', 'catalog'])
+const origins = new Set(['zmodel', 'sql', 'migration', 'catalog', 'application'])
 const byText = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0)
 
 export function lintOptions(options: LintOptions): void {
@@ -163,7 +163,7 @@ function validateConfig(config: LintConfig): void {
     (typeof config.dialect !== 'string' || !config.dialect.trim())
   )
     throw new TypeError('lint.dialect must be a nonempty string')
-  for (const key of ['sql', 'namespaces', 'presets'] as const)
+  for (const key of ['sql', 'source', 'namespaces', 'presets'] as const)
     if (config[key] !== undefined) strings(config[key], 'lint.' + key)
   if (config.rules !== undefined) record(config.rules, 'lint.rules')
   if (config.catalog !== undefined) {

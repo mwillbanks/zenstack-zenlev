@@ -1,0 +1,37 @@
+---
+title: 'No raw queries'
+description: 'Reject raw SQL APIs and fragments outside migrations.'
+---
+
+Checks application files selected by `lint.source`. The recommended preset enables this rule at `error`.
+
+## Configuration
+
+```ts
+import { defineConfig } from '@mwillbanks/zenstack-zenlev'
+
+export default defineConfig({
+  lint: {
+    source: ['src/**/*.{ts,tsx,js,jsx}'],
+    rules: {
+      'zenlev/queries/no-raw': 'error',
+    },
+  },
+})
+```
+
+## Parameters
+
+The rule has only shared selectors.
+
+It rejects recognized raw query and execution APIs, Kysely `sql` templates and raw fragments, and driver calls that accept SQL text. Parameter binding does not exempt raw SQL. SQL loaded from another file remains raw when application code executes it.
+
+Unrelated methods with matching names do not establish a database operation. Review coverage gaps for dynamic wrappers and unresolved source identities.
+
+All built-in rules accept the [shared selectors](./reference/lint-rules#shared-selectors). Use file overrides for reviewed exceptions.
+
+## Example
+
+A Kysely `sql` template violates the rule even when every value uses a bound parameter. Replace it with an allowed typed query or move the operation into a migration. Existing configured `.sql` inputs retain their database lint checks.
+
+Discovered migrations remain exempt, even when `lint.migrations: false`. Review unresolved dynamic source coverage gaps before claiming compliance.

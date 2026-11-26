@@ -9,13 +9,26 @@ import { parseSqlLintInput, readMigrationLintInputs } from './source'
 import type { LintConfig, LintInput, LintOptions, LintResult } from './types'
 import { readZModelLintInput } from './zmodel'
 
-async function sqlFiles(cwd: string, patterns: readonly string[]): Promise<readonly string[]> {
+async function inputFiles(cwd: string, patterns: readonly string[]): Promise<readonly string[]> {
   const paths = new Set<string>()
   for (const pattern of patterns) {
     for await (const path of new Bun.Glob(pattern).scan({ cwd, absolute: true, onlyFiles: true }))
       paths.add(resolve(cwd, path))
   }
   return [...paths].sort()
+}
+
+function applicationMode(
+  project: ResolvedProjectConfig,
+  schemaDialect: string | undefined,
+): 'zenstack' | 'standalone' {
+  if (schemaDialect || project.schema) return 'zenstack'
+  const client = project.adapter?.root.client ?? project.client
+  if (client && typeof client === 'object') {
+    if ('$qb' in client) return 'zenstack'
+    if ('selectFrom' in client) return 'standalone'
+  }
+  return project.lint?.zmodel === false ? 'standalone' : 'zenstack'
 }
 
 async function readOffline(
@@ -30,9 +43,17 @@ async function readOffline(
   const dialect = config.dialect ?? schema.dialect
   if (config.dialect && schema.dialect && config.dialect !== schema.dialect)
     throw new Error('Lint dialect does not match the ZModel datasource')
-  const migrations =
-    config.migrations !== false ? await listMigrationFiles(project.migrationsDir) : []
-  const files = await sqlFiles(project.cwd, config.sql ?? [])
+  const source = (await inputFiles(project.cwd, config.source ?? [])).filter(
+    (path) => /\.(?:[cm]?[jt]s|[jt]sx)$/u.test(path) && !/\.d\.[cm]?ts$/u.test(path),
+  )
+  const migrationFiles =
+    config.migrations !== false || source.length > 0
+      ? await listMigrationFiles(project.migrationsDir)
+      : []
+  const migrations = config.migrations === false ? [] : migrationFiles
+  const migrationPaths = new Set(migrationFiles)
+  const application = source.filter((path) => !migrationPaths.has(path))
+  const files = await inputFiles(project.cwd, config.sql ?? [])
   const batches: LintBatch[] = [schema]
   for (const path of files) {
     const sql = await Bun.file(path).text()
@@ -49,7 +70,15 @@ async function readOffline(
     batches.push(await readMigrationLintInputs(path, dialect, ['up']))
     batches.push(await readMigrationLintInputs(path, dialect, ['down']))
   }
-  const inputs = new Set([...files, ...migrations])
+  if (application.length > 0) {
+    const { createApplicationLintReader } = await import('./source/application')
+    const readApplicationLintInput = createApplicationLintReader()
+    const mode = applicationMode(project, schema.dialect)
+    for (const path of application) {
+      batches.push(await readApplicationLintInput(path, dialect, mode))
+    }
+  }
+  const inputs = new Set([...files, ...migrations, ...application])
   for (const { source } of schema.nodes) if (source) inputs.add(source.path)
   return { batches, files: inputs.size }
 }

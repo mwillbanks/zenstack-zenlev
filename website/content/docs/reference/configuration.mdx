@@ -55,7 +55,9 @@ SHA-512, SHA-1, and MD5 are also supported hash algorithms. Keep hash settings s
 
 ## Lint configuration
 
-Set `lint.presets`, `rules`, `sql`, `overrides`, `plugins`, and `exceptions` for database policy. The default preset is `recommended`. Set `zmodel: false` for SQL-only projects and `migrations: false` to exclude migration source. Set `dialect` when SQL files need an explicit parser dialect.
+Set `lint.presets`, `rules`, `source`, `sql`, `overrides`, `plugins`, and `exceptions` for database and application query policy. The default preset is `recommended`. Set `zmodel: false` for SQL-only projects and `migrations: false` to exclude migration source. Set `dialect` when SQL files need an explicit parser dialect.
+
+Set `lint.source` to explicit TypeScript and JavaScript globs relative to the effective `cwd`, such as `['src/**/*.{ts,tsx,js,jsx}']`. Its default is an empty list. Discovered migrations are exempt from application query rules, even when `lint.migrations: false`. Source scanning does not import application modules or acquire a connection. It runs only in offline lint, not live audits or write-plan enforcement.
 
 Rule settings merge by ID across configuration layers. Arrays replace lower-layer arrays. Matching overrides apply in declaration order. Lint plugin specifiers resolve relative to their declaring configuration.
 
